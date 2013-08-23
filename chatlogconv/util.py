@@ -1,4 +1,5 @@
 import re
+import datetime
 
 from errors import ParseError
 
@@ -17,9 +18,6 @@ def get_text(nodes):
             textlist.append(get_text(node.childNodes))
 
     return ''.join(textlist)
-
-def get_html(nodes):
-    return ''.join([x.toxml() for x in nodes])
 
 def parse_path(path, pattern):
     s = re.split('<(.*?)>', pattern)
