@@ -7,6 +7,8 @@ import signal
 import traceback
 from os.path import join, dirname, exists, expanduser, isfile, isdir
 from argparse import ArgumentParser, ArgumentTypeError
+from multiprocessing import Process, Queue, cpu_count, RLock, Value
+from Queue import Empty
 
 from chatlogconv import formats
 from chatlogconv import util
@@ -14,6 +16,53 @@ from chatlogconv.errors import AbortedError, ParseError
 
 PROGNAME = 'chatlogconv'
 VERSION = '0.1'
+
+class Progress(object):
+    """thread safe progress updater"""
+    def __init__(self, total, options):
+        self.total = total
+        self.options = options
+        self.n = Value('i', 0)
+        self._lock = RLock()
+
+    def update(self, i, path):
+        with self._lock:
+            self.n.value += i
+            if not self.options.verbose:
+                msg = '\r%i/%i' % (self.n.value, self.total)
+                end = ''
+            else:
+                msg = '%s\n    %i/%i' % (path, self.n.value, self.total)
+                end = '\n'
+            if self.options.dry_run:
+                msg += ' (DRY RUN)'
+            print(msg, end=end)
+            sys.stdout.flush()
+
+class Parser(Process):
+    def __init__(self, queue, options, progress):
+        super(Parser, self).__init__()
+        self.queue = queue
+        self.options = options
+        self.progress = progress
+
+    def run(self):
+        while True:
+            try:
+                item = self.queue.get()
+                if item is None:
+                    break
+                dstpath, wmodule, src_conversations = item
+                if self.options.dry_run:
+                    dst_conversations = src_conversations
+                else:
+                    dst_conversations = []
+                    for c in src_conversations:
+                        dst_conversations.extend(wmodule.parse(c.path))
+                write_outfile(wmodule, dstpath, dst_conversations)
+                self.progress.update(len(dst_conversations), dstpath)
+            except Empty:
+                break
 
 def isfileordir(value):
     if not isfile(value) and not isdir(value):
@@ -51,6 +100,11 @@ def parse_args():
                         action='store_true',
                         default=False,
                         )
+    parser.add_argument("-t", "--threads", metavar="NUM_THREADS",
+                        help=("use NUM_THREADS worker processes for parsing"),
+                        type=int,
+                        default=cpu_count(),
+                        )
     parser.add_argument("-v", "--verbose",
                         help=("enable verbose output"),
                         action='store_true',
@@ -59,7 +113,40 @@ def parse_args():
 
     return parser.parse_args()
 
-def convert(options):
+fslock = RLock()
+def write_outfile(module, path, conversations):
+    dstdir = dirname(path)
+    with fslock:
+        if not exists(dstdir):
+            os.makedirs(dstdir)
+    try:
+        module.write(path, conversations)
+        n = len(conversations)
+    except:
+        n = 0
+        if isfile(dstpath):
+            os.unlink(dstpath)
+        raise
+
+    return n
+
+def convert(to_write, total, options):
+    #TODO: handle keyboard interrupts
+    queue = Queue()
+    progress = Progress(total, options)
+    workers = [Parser(queue, options, progress)
+               for i in range(options.threads)]
+    for w in workers:
+        w.start()
+    for (dstpath, wmodule), src_conversations in iter(to_write.items()):
+        queue.put((dstpath, wmodule, src_conversations))
+    for w in workers:
+        queue.put(None)
+    for w in workers:
+        w.join()
+    return 0
+
+def main(options):
     src_paths = util.get_paths(options.source)
     dst_paths = util.get_paths([options.destination])
     modules =  [x() for x in formats.all_formats.values()]
@@ -81,47 +168,21 @@ def convert(options):
     print('converting %i from source (%i already exist at destination)' %
           (len(conversations), num_existing))
 
-    # (outpath, wmodule): [conversations in that file])
+    # (dstpath, wmodule): [conversations for dstpath])
     to_write = {}
     for c in conversations:
         rmodule = c.parsedby
         wmodule = modules[options.format] if options.format else rmodule
-        outpath = join(options.destination, wmodule.get_path(c))
-        key = (outpath, wmodule)
+        dstpath = join(options.destination, wmodule.get_path(c))
+        key = (dstpath, wmodule)
         if key not in to_write:
             to_write[key] = []
         to_write[key].append(c)
 
-    t = len(conversations)
-    n = 0
+    convert(to_write, len(conversations), options)
 
-    for (outpath, wmodule), old_conversations in iter(to_write.items()):
-        if not options.dry_run:
-            new_conversations = []
-            for c in old_conversations:
-                new_conversations.extend(c.parsedby.parse(c.path))
-            try:
-                outdir = dirname(outpath)
-                if not exists(outdir):
-                    os.makedirs(outdir)
-                wmodule.write(outpath, new_conversations)
-            except:
-                if isfile(outpath):
-                    os.unlink(outpath)
-                raise
-
-        n += len(old_conversations)
-        if not options.verbose:
-            msg = '\r%i/%i' % (n, t)
-            end = ''
-        else:
-            msg = '%s\n    %i/%i' % (outpath, n, t)
-            end = '\n'
-        if options.dry_run:
-            msg += ' (DRY RUN)'
-        print(msg, end=end)
-        sys.stdout.flush()
-
+    if not options.verbose:
+        print('')
     return 0
 
 def abort(*args):
@@ -139,7 +200,7 @@ if __name__ == "__main__":
         for sig in filter(None, SIGS):
             signal.signal(sig, abort)
         options = parse_args()
-        exitcode = convert(options)
+        exitcode = main(options)
     except AbortedError:
         exitcode = 1
         print("***aborted***", file=sys.stderr)
