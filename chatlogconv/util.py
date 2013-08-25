@@ -1,5 +1,7 @@
+import os
 import re
 import datetime
+from os.path import join, isfile
 
 from errors import ParseError
 
@@ -32,6 +34,8 @@ def parse_path(path, pattern):
         s[i] = "(?P<%s%i>.*?)" % (s[i], keys[key])
     regex_pattern = ''.join(s)
     s = re.search(regex_pattern, path)
+    if not s:
+        return None
 
     results = {}
     for key, value in iter(s.groupdict().items()):
@@ -41,3 +45,34 @@ def parse_path(path, pattern):
         results[k] = value
 
     return results
+
+def get_conversations(paths, modules):
+    conversations = set()
+
+    for path in paths:
+        for i, m in enumerate(modules):
+            parsed = m.parse(path, messages=False)
+            if parsed:
+                for c in parsed:
+                    c.parsedby = m
+                    conversations.add(c)
+                if i != 0:
+                    # try this module first next time
+                    modules[i] = modules[0]
+                    modules[0] = m
+                break
+
+    return conversations
+
+def get_paths(paths):
+    newpaths = set()
+    for path in paths:
+        if isfile(path):
+            newpaths.add(path)
+        else:
+            for root, dirs, files in os.walk(path):
+                for f in files:
+                    p = join(root, f)
+                    newpaths.add(p)
+
+    return sorted(newpaths)

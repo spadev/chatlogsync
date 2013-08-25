@@ -1,19 +1,41 @@
 import util
 
 class Conversation(object):
-    def __init__(self, source, destination, service, time, images=[]):
+    def __init__(self, path, source, destination, service, time, images=[]):
         self.source = source
         self.destination = destination
         self.service = service
         self.time = time
-        self.images = images # always absolute paths
+        self.path = path
+        self.images = images # always relative paths
         self.entries = []
 
     def __unicode__(self):
-        s = 'source: %s, destination: %s, service: %s, time: %s\n' % \
+        s = 'source: %s, destination: %s, service: %s, time: %s' % \
             (self.source, self.destination, self.service, self.time)
-        s += '\n'.join(['  '+unicode(x) for x in self.entries])
+        if self.images:
+            s += ' images: %s' % ', '.join(self.images)
+        e = ['  '+unicode(x) for x in self.entries]
+        if e:
+            s += '\n'+'\n'.join(e)
         return s
+
+
+    def __hash__(self):
+        h = hash(self.source)
+        for k in ('destination', 'service', 'time'):
+            h = h^hash(getattr(self, k))
+        for k in ('images', 'entries'):
+            h = h^hash(tuple(getattr(self, k)))
+
+        return h
+
+    def __eq__(self, other):
+        for k in ('source', 'destination', 'service', 'time',
+                  'images', 'entries'):
+            if getattr(self, k) != getattr(other, k):
+                return False
+        return True
 
 class Entry(object):
     def __init__(self, **kwargs):

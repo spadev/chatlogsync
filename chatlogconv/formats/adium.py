@@ -4,16 +4,18 @@ import datetime
 import re
 import codecs
 import shutil
-from os.path import join, dirname, realpath
+from os.path import join, dirname, relpath
 from xml.dom import minidom
 
 from dateutil.parser import parse
 
-import util
-from errors import ParseError
-from conversation import Conversation, Message, Status, Event
+from _base import ChatlogFormat
+from chatlogconv import util
+from chatlogconv.errors import ParseError
+from chatlogconv.conversation import Conversation, Message, Status, Event
 
-class Adium(object):
+class Adium(ChatlogFormat):
+    type = 'adium'
     SERVICE_MAP = {'GTalk' : 'gtalk',
                    'AIM' : 'aim'
                    }
@@ -59,16 +61,20 @@ class Adium(object):
 
     def parse(self, path, messages=True):
         info = util.parse_path(path, self.FILE_PATTERN)
+        if not info:
+            return None
+
         time = parse(info['time'].replace('.', ':'))
         source = info['source']
         destination = info['destination']
         service = self.SERVICE_MAP[info['service']]
 
         dp = dirname(path)
-        images = [realpath(join(dp, x)) for x in os.listdir(dp)
+        images = [relpath(join(dp, x), start=dp) for x in os.listdir(dp)
                   if not x.endswith('.xml')]
 
-        conversation = Conversation(source, destination, service, time, images)
+        conversation = Conversation(path, source, destination,
+                                    service, time, images)
         if not messages:
             return [conversation]
 
@@ -109,7 +115,9 @@ class Adium(object):
 
         return [conversation]
 
-    def write(self, path, conversation):
+    def write(self, path, conversations):
+        assert(len(conversations) == 1)
+        conversation = conversations[0]
         impl = minidom.getDOMImplementation()
         doc = impl.createDocument(None, "chat", None)
 
@@ -160,10 +168,16 @@ class Adium(object):
         chat.removeChild(chat.lastChild)
 
         # images
-        for fullpath in conversation.images:
-            shutil.copy(fullpath, join(dirname(path), self.IMAGE_DIRECTORY))
+        for img_relpath in conversation.images:
+            srcdir = dirname(conversation.path)
+            dstdir = dirname(path)
+            srcimg = join(srcdir, img_relpath)
+            dstimg = join(dstdir, img_relpath)
+            shutil.copy(srcimg, dstimg)
 
         with codecs.open(path, 'wb', 'utf-8') as fh:
             fh.write('<?xml version="1.0" encoding="UTF-8"?>\n')
             chat.writexml(fh)
             fh.write('\n')
+
+formats = [Adium]
