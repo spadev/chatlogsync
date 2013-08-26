@@ -1,3 +1,7 @@
+from __future__ import unicode_literals
+from __future__ import print_function
+from __future__ import absolute_import
+
 import os
 import sys
 import datetime
@@ -9,7 +13,7 @@ from xml.dom import minidom
 
 from dateutil.parser import parse
 
-from _base import ChatlogFormat
+from chatlogconv.formats._base import ChatlogFormat
 from chatlogconv import util
 from chatlogconv.errors import ParseError
 from chatlogconv.conversation import Conversation, Message, Status, Event
@@ -116,7 +120,10 @@ class Adium(ChatlogFormat):
         return [conversation]
 
     def write(self, path, conversations):
-        assert(len(conversations) == 1)
+        if len(conversations) != 1:
+            msg = '%s only supports one conversation per file:\n  %s has %i' % \
+                  (self.type, path, len(conversations))
+            raise ParseError(msg)
         conversation = conversations[0]
         impl = minidom.getDOMImplementation()
         doc = impl.createDocument(None, "chat", None)

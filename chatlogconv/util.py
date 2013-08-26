@@ -1,15 +1,13 @@
+from __future__ import unicode_literals
+from __future__ import print_function
+from __future__ import absolute_import
+
 import os
 import re
 import datetime
 from os.path import join, isfile
 
-from errors import ParseError
-
-def to_unicode(obj, encoding='utf-8'):
-    if isinstance(obj, basestring):
-        if not isinstance(obj, unicode):
-            obj = unicode(obj, encoding)
-    return obj
+from chatlogconv.errors import ParseError
 
 def get_text(nodes):
     textlist = []

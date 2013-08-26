@@ -1,4 +1,8 @@
-import util
+from __future__ import unicode_literals
+from __future__ import print_function
+from __future__ import absolute_import
+
+from chatlogconv import util
 
 class Conversation(object):
     def __init__(self, path, source, destination, service, time, images=[]):
@@ -10,16 +14,16 @@ class Conversation(object):
         self.images = images # always relative paths
         self.entries = []
 
-    def __unicode__(self):
+    def __str__(self):
         s = 'source: %s, destination: %s, service: %s, time: %s' % \
             (self.source, self.destination, self.service, self.time)
         if self.images:
             s += ' images: %s' % ', '.join(self.images)
-        e = ['  '+unicode(x) for x in self.entries]
+        e = ['  '+str(x) for x in self.entries]
         if e:
             s += '\n'+'\n'.join(e)
-        return s
 
+        return s
 
     def __hash__(self):
         h = hash(self.source)
@@ -39,9 +43,9 @@ class Conversation(object):
 
 class Entry(object):
     def __init__(self, **kwargs):
-        self._alias = u''
-        self._sender = u''
-        self._text = u''
+        self._alias = ''
+        self._sender = ''
+        self._text = ''
         self.time = None
         self.html = None
         self.type = None
@@ -55,7 +59,7 @@ class Entry(object):
 
     @alias.setter
     def alias(self, alias):
-        self._alias = util.to_unicode(alias)
+        self._alias = alias
 
     @property
     def text(self):
@@ -66,7 +70,7 @@ class Entry(object):
 
     @text.setter
     def text(self, text):
-        self._text = util.to_unicode(text)
+        self._text = text
 
     @property
     def sender(self):
@@ -74,11 +78,13 @@ class Entry(object):
 
     @sender.setter
     def sender(self, sender):
-        self._sender = util.to_unicode(sender)
+        self._sender = sender
 
-    def __unicode__(self):
-        return '%s (%s) [%s]: %s' % (self.sender, self.alias,
-                                     self.time.strftime('%X'), self.text)
+    def __str__(self):
+        s = '%s (%s) [%s]: %s' % (self.sender, self.alias,
+                                  self.time.strftime('%X'), self.text)
+
+        return s
 
 class Message(Entry):
     def __init__(self, alias, sender, time, text='', html=None):

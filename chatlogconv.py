@@ -1,5 +1,7 @@
 #!/usr/bin/python
+from __future__ import unicode_literals
 from __future__ import print_function
+from __future__ import absolute_import
 
 import os
 import sys
@@ -41,11 +43,12 @@ class Progress(object):
             sys.stdout.flush()
 
 class Parser(Process):
-    def __init__(self, queue, options, progress):
+    def __init__(self, queue, errorqueue, options, progress):
         super(Parser, self).__init__()
         self.queue = queue
         self.options = options
         self.progress = progress
+        self.errorqueue = errorqueue
         self._stopped = False
 
     def stop(self):
@@ -60,6 +63,7 @@ class Parser(Process):
                 # flush queue if stopped
                 if self._stopped:
                     continue
+
                 dstpath, wmodule, src_conversations = item
                 if self.options.dry_run:
                     dst_conversations = src_conversations
@@ -71,6 +75,11 @@ class Parser(Process):
                 self.progress.update(len(dst_conversations), dstpath)
             except AbortedError:
                 self.stop()
+            except Exception as e:
+                tb = traceback.format_exc()
+                self.errorqueue.put((dstpath, tb))
+
+        self.errorqueue.put(None)
 
 def isfileordir(value):
     if not isfile(value) and not isdir(value):
@@ -141,9 +150,10 @@ def write_outfile(module, path, conversations):
 def convert(to_write, total, options):
     global WORKERS
     queue = Queue()
+    errorqueue = Queue()
 
     progress = Progress(total, options)
-    WORKERS = [Parser(queue, options, progress)
+    WORKERS = [Parser(queue, errorqueue, options, progress)
                for i in range(options.threads)]
     for w in WORKERS:
         w.start()
@@ -204,6 +214,18 @@ def cleanup(exitcode):
         w.stop()
     for w in WORKERS:
         w.join()
+        errorqueue = w.errorqueue
+
+    n = 0
+    errors = []
+    while n < len(WORKERS):
+        item = errorqueue.get_nowait()
+        if item is None:
+            n += 1
+            continue
+        errors.append(item)
+
+    return errors
 
 if __name__ == "__main__":
     options = None
@@ -211,18 +233,23 @@ if __name__ == "__main__":
         exitcode = 0
         SIGS = [getattr(signal, s, None) for s in
                 "SIGINT SIGTERM SIGHUP".split()]
-        for sig in filter(None, SIGS):
+        for sig in [s for s in SIGS if s]:
             signal.signal(sig, abort)
         options = parse_args()
         exitcode = main(options)
     except AbortedError:
         exitcode = 1
         print("***aborted***", file=sys.stderr)
-    except ParseError as e:
-        exitcode = 2
-        print(e, file=sys.stderr)
     except Exception as e:
         traceback.print_exc()
     finally:
-        cleanup(exitcode)
-        sys.exit(exitcode)
+        errors = cleanup(exitcode)
+        ne = len(errors)
+        if ne:
+            print('\n%i error%s while parsing:' % (ne, '' if ne == 1 else 's'),
+                  file=sys.stderr)
+        for path, error in errors:
+            msg = "%s\n%s" % (path, error)
+            print(msg, file=sys.stderr)
+
+        sys.exit(ne)
