@@ -8,7 +8,7 @@ import datetime
 import re
 import codecs
 import shutil
-from os.path import join, dirname, relpath
+from os.path import join, dirname, relpath, realpath
 from xml.dom import minidom
 
 from dateutil.parser import parse
@@ -180,7 +180,8 @@ class Adium(ChatlogFormat):
             dstdir = dirname(path)
             srcimg = join(srcdir, img_relpath)
             dstimg = join(dstdir, img_relpath)
-            shutil.copy(srcimg, dstimg)
+            if realpath(srcimg) != realpath(dstimg):
+                shutil.copy(srcimg, dstimg)
 
         with codecs.open(path, 'wb', 'utf-8') as fh:
             fh.write('<?xml version="1.0" encoding="UTF-8"?>\n')

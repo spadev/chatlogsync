@@ -49,10 +49,16 @@ class Parser(Process):
         self.options = options
         self.progress = progress
         self.errorqueue = errorqueue
+        self.tempfiles = []
         self._stopped = False
 
     def stop(self):
         self._stopped = True
+
+    def cleanup(self):
+        for tempfile in self.tempfiles:
+            if exists(tempfile):
+                os.unlink(tempfile)
 
     def run(self):
         while True:
@@ -71,7 +77,12 @@ class Parser(Process):
                     dst_conversations = []
                     for c in src_conversations:
                         dst_conversations.extend(wmodule.parse(c.path))
-                write_outfile(wmodule, dstpath, dst_conversations)
+                tmppath = dstpath+'.tmp'
+
+                self.tempfiles.append(tmppath)
+                write_outfile(wmodule, dstpath, tmppath, dst_conversations)
+                del self.tempfiles[-1]
+
                 self.progress.update(len(dst_conversations), dstpath)
             except AbortedError:
                 self.stop()
@@ -80,6 +91,7 @@ class Parser(Process):
                 self.errorqueue.put((dstpath, tb))
 
         self.errorqueue.put(None)
+        self.cleanup()
 
 def isfileordir(value):
     if not isfile(value) and not isdir(value):
@@ -131,21 +143,16 @@ def parse_args():
     return parser.parse_args()
 
 fslock = RLock()
-def write_outfile(module, path, conversations):
+def write_outfile(module, path, tmppath, conversations):
     dstdir = dirname(path)
     with fslock:
         if not exists(dstdir):
             os.makedirs(dstdir)
-    try:
-        module.write(path, conversations)
-        n = len(conversations)
-    except:
-        n = 0
-        if isfile(path):
-            os.unlink(path)
-        raise
 
-    return n
+    module.write(tmppath, conversations)
+    os.rename(tmppath, path)
+
+    return len(conversations)
 
 def convert(to_write, total, options):
     global WORKERS
