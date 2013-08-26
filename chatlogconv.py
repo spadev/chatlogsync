@@ -8,7 +8,6 @@ import traceback
 from os.path import join, dirname, exists, expanduser, isfile, isdir
 from argparse import ArgumentParser, ArgumentTypeError
 from multiprocessing import Process, Queue, cpu_count, RLock, Value
-from Queue import Empty
 
 from chatlogconv import formats
 from chatlogconv import util
@@ -16,6 +15,8 @@ from chatlogconv.errors import AbortedError, ParseError
 
 PROGNAME = 'chatlogconv'
 VERSION = '0.1'
+
+WORKERS = []
 
 class Progress(object):
     """thread safe progress updater"""
@@ -45,6 +46,10 @@ class Parser(Process):
         self.queue = queue
         self.options = options
         self.progress = progress
+        self._stopped = False
+
+    def stop(self):
+        self._stopped = True
 
     def run(self):
         while True:
@@ -52,6 +57,9 @@ class Parser(Process):
                 item = self.queue.get()
                 if item is None:
                     break
+                # flush queue if stopped
+                if self._stopped:
+                    continue
                 dstpath, wmodule, src_conversations = item
                 if self.options.dry_run:
                     dst_conversations = src_conversations
@@ -61,8 +69,8 @@ class Parser(Process):
                         dst_conversations.extend(wmodule.parse(c.path))
                 write_outfile(wmodule, dstpath, dst_conversations)
                 self.progress.update(len(dst_conversations), dstpath)
-            except Empty:
-                break
+            except AbortedError:
+                self.stop()
 
 def isfileordir(value):
     if not isfile(value) and not isdir(value):
@@ -124,26 +132,29 @@ def write_outfile(module, path, conversations):
         n = len(conversations)
     except:
         n = 0
-        if isfile(dstpath):
-            os.unlink(dstpath)
+        if isfile(path):
+            os.unlink(path)
         raise
 
     return n
 
 def convert(to_write, total, options):
-    #TODO: handle keyboard interrupts
+    global WORKERS
     queue = Queue()
+
     progress = Progress(total, options)
-    workers = [Parser(queue, options, progress)
+    WORKERS = [Parser(queue, options, progress)
                for i in range(options.threads)]
-    for w in workers:
+    for w in WORKERS:
         w.start()
     for (dstpath, wmodule), src_conversations in iter(to_write.items()):
         queue.put((dstpath, wmodule, src_conversations))
-    for w in workers:
+    for w in WORKERS:
         queue.put(None)
-    for w in workers:
+
+    for w in WORKERS:
         w.join()
+
     return 0
 
 def main(options):
@@ -189,7 +200,10 @@ def abort(*args):
     raise AbortedError
 
 def cleanup(exitcode):
-    pass
+    for w in WORKERS:
+        w.stop()
+    for w in WORKERS:
+        w.join()
 
 if __name__ == "__main__":
     options = None
