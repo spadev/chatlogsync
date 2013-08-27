@@ -2,7 +2,10 @@ from __future__ import unicode_literals
 from __future__ import print_function
 from __future__ import absolute_import
 
+import time as time_module
+
 from chatlogconv import util
+from chatlogconv.timezones import getoffset
 
 class Conversation(object):
     def __init__(self, path, source, destination, service, time, images=[]):
@@ -13,6 +16,25 @@ class Conversation(object):
         self.path = path
         self.images = images # always relative paths
         self.entries = []
+
+    @property
+    def time(self):
+        return self._time
+
+    @time.setter
+    def time(self, time):
+        if not time.tzinfo:
+            abbrev = time_module.tzname[time_module.daylight]
+            if time_module.daylight:
+                offset = -time_module.altzone
+            else:
+                offset = -time_module.timezone
+            time = time.replace(tzinfo=getoffset(abbrev, offset))
+        elif not time.tzname():
+            offset = time.strftime('%z')
+            time = time.replace(tzinfo=getoffset(None, offset))
+
+        self._time = time
 
     def __str__(self):
         s = 'source: %s, destination: %s, service: %s, time: %s' % \
@@ -43,23 +65,15 @@ class Conversation(object):
 
 class Entry(object):
     def __init__(self, **kwargs):
-        self._alias = ''
-        self._sender = ''
-        self._text = ''
+        self.alias = ''
+        self.sender = ''
+        self.text = ''
         self.time = None
         self.html = None
         self.type = None
 
         for k, v in iter(kwargs.items()):
             setattr(self, k, v)
-
-    @property
-    def alias(self):
-        return self._alias
-
-    @alias.setter
-    def alias(self, alias):
-        self._alias = alias
 
     @property
     def text(self):
@@ -71,14 +85,6 @@ class Entry(object):
     @text.setter
     def text(self, text):
         self._text = text
-
-    @property
-    def sender(self):
-        return self._sender
-
-    @sender.setter
-    def sender(self, sender):
-        self._sender = sender
 
     def __str__(self):
         s = '%s (%s) [%s]: %s' % (self.sender, self.alias,

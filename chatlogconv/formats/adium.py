@@ -3,9 +3,6 @@ from __future__ import print_function
 from __future__ import absolute_import
 
 import os
-import sys
-import datetime
-import re
 import codecs
 import shutil
 from os.path import join, dirname, relpath, realpath
@@ -17,13 +14,13 @@ from chatlogconv.formats._base import ChatlogFormat
 from chatlogconv import util
 from chatlogconv.errors import ParseError
 from chatlogconv.conversation import Conversation, Message, Status, Event
+from chatlogconv.timezones import getoffset
 
 class Adium(ChatlogFormat):
     type = 'adium'
     SERVICE_MAP = {'GTalk' : 'gtalk',
                    'AIM' : 'aim'
                    }
-    PAM_ECIVRES = {v: k for (k, v) in iter(SERVICE_MAP.items())}
 
     STATUS_TYPEMAP = {'offline': Status.OFFLINE,
                       'online': Status.ONLINE,
@@ -51,24 +48,12 @@ class Adium(ChatlogFormat):
     TIME_FMT_CONVERSATION = '%Y-%m-%dT%H:%M:%S%z'
     XMLNS = "http://purl.org/net/ulf/ns/0.4-02"
 
-    def get_path(self, conversation):
-        s = re.split('<(.*?)>', self.FILE_PATTERN)
-        for i in range(1, len(s), 2):
-            a = getattr(conversation, s[i])
-            if s[i] == 'service':
-                a = self.PAM_ECIVRES[a]
-            elif isinstance(a, datetime.datetime):
-                a = a.strftime(self.TIME_FMT_FILE)
-            s[i] = a
-
-        return ''.join(s)
-
     def parse(self, path, messages=True):
         info = util.parse_path(path, self.FILE_PATTERN)
         if not info:
             return None
 
-        time = parse(info['time'].replace('.', ':'))
+        time = parse(info['time'].replace('.', ':'), tzinfos=getoffset)
         source = info['source']
         destination = info['destination']
         service = self.SERVICE_MAP[info['service']]
@@ -82,13 +67,15 @@ class Adium(ChatlogFormat):
         if not messages:
             return [conversation]
 
+        # parse xml
         doc = minidom.parse(path)
 
         for e in [x for x in doc.getElementsByTagName('chat')[0].childNodes
                   if x.nodeType == x.ELEMENT_NODE]:
             alias = e.getAttribute('alias')
             sender = e.getAttribute('sender')
-            time = parse(e.getAttribute('time'))
+            time = parse(e.getAttribute('time'), default=conversation.time,
+                         ignoretz=True)
 
             html =  e.childNodes
 
@@ -124,6 +111,7 @@ class Adium(ChatlogFormat):
             msg = '%s only supports one conversation per file:\n  %s has %i' % \
                   (self.type, path, len(conversations))
             raise ParseError(msg)
+
         conversation = conversations[0]
         impl = minidom.getDOMImplementation()
         doc = impl.createDocument(None, "chat", None)
