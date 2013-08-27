@@ -4,16 +4,18 @@ from __future__ import absolute_import
 
 import time as time_module
 
-from chatlogconv import util
 from chatlogconv.timezones import getoffset
+from chatlogconv import util
 
 class Conversation(object):
-    def __init__(self, path, source, destination, service, time, images=[]):
+    def __init__(self, parsedby, path, source, destination,
+                 service, time, images=[]):
         self.source = source
         self.destination = destination
         self.service = service
         self.time = time
         self.path = path
+        self.parsedby = parsedby
         self.images = images # always relative paths
         self.entries = []
 
@@ -69,8 +71,8 @@ class Entry(object):
         self.sender = ''
         self.text = ''
         self.time = None
-        self.html = None
         self.type = None
+        self.html = []
 
         for k, v in iter(kwargs.items()):
             setattr(self, k, v)
@@ -78,7 +80,7 @@ class Entry(object):
     @property
     def text(self):
         if not self._text and self.html:
-            self._text = util.get_text(self.html)
+            self._text = ''.join([x.text for x in self.html])
 
         return self._text
 
@@ -93,7 +95,7 @@ class Entry(object):
         return s
 
 class Message(Entry):
-    def __init__(self, alias, sender, time, text='', html=None):
+    def __init__(self, alias, sender, time, text='', html=[]):
         super(Message, self).__init__(alias=alias, sender=sender, time=time,
                                       text=text, html=html)
 
@@ -108,7 +110,7 @@ class Status(Entry):
     CHATERROR = 10
     PURPLE = 11
 
-    def __init__(self, alias, sender, time, type, text='', html=None):
+    def __init__(self, alias, sender, time, type, text='', html=[]):
         super(Status, self).__init__(alias=alias, sender=sender, type=type,
                                      time=time, text=text, html=html)
 
@@ -116,6 +118,6 @@ class Event(Entry):
     WINDOWCLOSED = 1
     WINDOWOPENED = 2
 
-    def __init__(self, alias, sender, time, type, text='', html=None):
+    def __init__(self, alias, sender, time, type, text='', html=[]):
         super(Event, self).__init__(alias=alias, sender=sender, type=type,
                                     time=time, text=text, html=html)

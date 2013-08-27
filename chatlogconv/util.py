@@ -9,17 +9,7 @@ from os.path import join, isfile
 
 from chatlogconv.errors import ParseError
 
-def get_text(nodes):
-    textlist = []
-    for node in nodes:
-        if node.nodeType == node.TEXT_NODE:
-            textlist.append(node.data)
-        elif node.childNodes:
-            textlist.append(get_text(node.childNodes))
-
-    return ''.join(textlist)
-
-def parse_path(path, pattern):
+def parse_string(string, pattern):
     s = re.split('<(.*?)>', pattern)
     keys = {}
     for i in range(0, len(s), 2):
@@ -31,7 +21,7 @@ def parse_path(path, pattern):
         keys[key] += 1
         s[i] = "(?P<%s%i>.*?)" % (s[i], keys[key])
     regex_pattern = ''.join(s)
-    s = re.search(regex_pattern, path)
+    s = re.search(regex_pattern, string)
     if not s:
         return None
 
@@ -39,7 +29,7 @@ def parse_path(path, pattern):
     for key, value in iter(s.groupdict().items()):
         k = re.sub('\d', '', key)
         if k in results and results[k] != value:
-            raise ParseError('Problem parsing path %s' % path)
+            raise ParseError('Problem parsing string %s' % string)
         results[k] = value
 
     return results
@@ -52,7 +42,6 @@ def get_conversations(paths, modules):
             parsed = m.parse(path, messages=False)
             if parsed:
                 for c in parsed:
-                    c.parsedby = m
                     conversations.add(c)
                 if i != 0:
                     # try this module first next time
