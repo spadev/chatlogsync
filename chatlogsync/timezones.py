@@ -1,5 +1,4 @@
 from __future__ import unicode_literals
-from __future__ import print_function
 from __future__ import absolute_import
 
 import locale
@@ -18,8 +17,8 @@ except Exception:
     country = ''
 country_timezones = []
 if not country:
-    print('Unable to determine country: '
-          'timezone abbreviations may not be what you want', file=sys.stderr)
+    print_w('Unable to determine country: '
+            'timezone abbreviations may not be what you want')
 country_timezones = pytz.country_timezones[country]
 
 tznames = collections.defaultdict(list)

@@ -1,5 +1,4 @@
 from __future__ import unicode_literals
-from __future__ import print_function
 from __future__ import absolute_import
 
 import os
@@ -7,7 +6,7 @@ import re
 import datetime
 from os.path import join, isfile
 
-from chatlogconv.errors import ParseError
+from chatlogsync.errors import ParseError
 
 def parse_string(string, pattern):
     s = re.split('<(.*?)>', pattern)

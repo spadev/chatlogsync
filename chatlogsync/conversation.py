@@ -1,11 +1,12 @@
 from __future__ import unicode_literals
-from __future__ import print_function
 from __future__ import absolute_import
 
 import time as time_module
 
-from chatlogconv.timezones import getoffset
-from chatlogconv import util
+from bs4.element import NavigableString
+
+from chatlogsync.timezones import getoffset
+from chatlogsync import util
 
 class Conversation(object):
     def __init__(self, parsedby, path, source, destination,
@@ -80,7 +81,22 @@ class Entry(object):
     @property
     def text(self):
         if not self._text and self.html:
-            self._text = ''.join([x.text for x in self.html])
+            strings = []
+            for x in self.html:
+                if isinstance(x, NavigableString):
+                    strings.append(x.string)
+                else:
+                    # links should always contain the url
+                    if x.name == 'a':
+                        if x.text != x['href']:
+                            s = '<%s %s>' % (x.text, x['href'])
+                        else:
+                            s = '<%s>' % (x['href'])
+                    else:
+                        s = x.text
+                    strings.append(s)
+
+            self._text = ''.join(strings)
 
         return self._text
 
@@ -89,15 +105,14 @@ class Entry(object):
         self._text = text
 
     def __str__(self):
-        s = '%s (%s) [%s]: %s' % (self.sender, self.alias,
-                                  self.time.strftime('%X'), self.text)
+        t = self.time.strftime('%X') if self.time else ''
+        s = '%s (%s) [%s]: %s' % (self.sender, self.alias, t, self.text)
 
         return s
 
 class Message(Entry):
-    def __init__(self, alias, sender, time, text='', html=[]):
-        super(Message, self).__init__(alias=alias, sender=sender, time=time,
-                                      text=text, html=html)
+    def __init__(self, **kwargs):
+        super(Message, self).__init__(**kwargs)
 
 class Status(Entry):
     OFFLINE = 1
@@ -110,14 +125,14 @@ class Status(Entry):
     CHATERROR = 10
     PURPLE = 11
 
-    def __init__(self, alias, sender, time, type, text='', html=[]):
-        super(Status, self).__init__(alias=alias, sender=sender, type=type,
-                                     time=time, text=text, html=html)
+    def __init__(self,  **kwargs):
+        assert('type' in kwargs)
+        super(Status, self).__init__(**kwargs)
 
 class Event(Entry):
     WINDOWCLOSED = 1
     WINDOWOPENED = 2
 
-    def __init__(self, alias, sender, time, type, text='', html=[]):
-        super(Event, self).__init__(alias=alias, sender=sender, type=type,
-                                    time=time, text=text, html=html)
+    def __init__(self, **kwargs):
+        assert('type' in kwargs)
+        super(Event, self).__init__(**kwargs)

@@ -1,5 +1,4 @@
 from __future__ import unicode_literals
-from __future__ import print_function
 from __future__ import absolute_import
 
 import re
@@ -9,6 +8,10 @@ class ChatlogFormat(object):
     type = 'unknown format'
     SERVICE_MAP = {}
     PAM_ECIVRES = {}
+    STATUS_TYPEMAP = {}
+    PAMEPYT_SUTATS = {}
+    EVENT_TYPEMAP = {}
+    PAMEPYT_TNEVE = {}
     FILE_PATTERN = ''
     TIME_FMT_FILE = ''
 
@@ -16,6 +19,12 @@ class ChatlogFormat(object):
         if not self.PAM_ECIVRES:
             self.PAM_ECIVRES = {v: k for (k, v) in
                                 iter(self.SERVICE_MAP.items())}
+        if not self.PAMEPYT_SUTATS:
+            self.PAMEPYT_SUTATS = {v: k for (k, v) in
+                                   iter(self.STATUS_TYPEMAP.items())}
+        if not self.PAMEPYT_TNEVE:
+            self.PAMEPYT_TNEVE = {v: k for (k, v) in
+                                  iter(self.EVENT_TYPEMAP.items())}
 
     def get_path(self, conversation):
         if (not self.FILE_PATTERN or not self.SERVICE_MAP

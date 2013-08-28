@@ -1,6 +1,5 @@
 #!/usr/bin/python
 from __future__ import unicode_literals
-from __future__ import print_function
 from __future__ import absolute_import
 
 import os
@@ -11,49 +10,46 @@ from os.path import join, dirname, exists, expanduser, isfile, isdir
 from argparse import ArgumentParser, ArgumentTypeError
 from multiprocessing import Process, Queue, cpu_count, RLock, Value
 
-from chatlogconv import formats
-from chatlogconv import util
-from chatlogconv.errors import AbortedError, ParseError
-
-PROGNAME = 'chatlogconv'
-VERSION = '0.1'
+import chatlogsync
+from chatlogsync import const, formats, util
+from chatlogsync.errors import AbortedError, ParseError
 
 WORKERS = []
 
 class Progress(object):
     """thread safe progress updater"""
-    def __init__(self, total, options):
+    def __init__(self, total):
         self.total = total
-        self.options = options
         self.n = Value('i', 0)
         self._lock = RLock()
 
     def update(self, i, path):
         with self._lock:
             self.n.value += i
-            if not self.options.verbose:
-                msg = '\r%i/%i' % (self.n.value, self.total)
-                end = ''
-            else:
-                msg = '%s\n    %i/%i' % (path, self.n.value, self.total)
-                end = '\n'
-            if self.options.dry_run:
-                msg += ' (DRY RUN)'
-            print(msg, end=end)
-            sys.stdout.flush()
+        print_v(path)
+        print_('\r[%i/%i] ' % (self.n.value, self.total), end='')
+        print_v('\n')
+
+        if const.DRYRUN:
+            print_(' (DRY RUN)')
+        sys.stdout.flush()
 
 class Parser(Process):
-    def __init__(self, queue, errorqueue, options, progress):
+    def __init__(self, destination, queue, progress):
         super(Parser, self).__init__()
         self.queue = queue
-        self.options = options
         self.progress = progress
-        self.errorqueue = errorqueue
         self.tempfiles = []
+        self.destination = destination
+        self._num_errors = Value('i', 0)
         self._stopped = False
 
     def stop(self):
         self._stopped = True
+
+    @property
+    def num_errors(self):
+        return self._num_errors.value
 
     def cleanup(self):
         for tempfile in self.tempfiles:
@@ -63,6 +59,7 @@ class Parser(Process):
     def run(self):
         while True:
             try:
+                dstpath = ''
                 item = self.queue.get()
                 if item is None:
                     break
@@ -71,7 +68,7 @@ class Parser(Process):
                     continue
 
                 dstpath, wmodule, src_conversations = item
-                if self.options.dry_run:
+                if const.DRYRUN:
                     dst_conversations = src_conversations
                 else:
                     dst_conversations = []
@@ -80,7 +77,9 @@ class Parser(Process):
                 tmppath = dstpath+'.tmp'
 
                 self.tempfiles.append(tmppath)
-                write_outfile(wmodule, dstpath, tmppath, dst_conversations)
+                realdstpath = join(self.destination, dstpath)
+                write_outfile(wmodule, realdstpath,
+                              tmppath, dst_conversations)
                 del self.tempfiles[-1]
 
                 self.progress.update(len(dst_conversations), dstpath)
@@ -88,9 +87,10 @@ class Parser(Process):
                 self.stop()
             except Exception as e:
                 tb = traceback.format_exc()
-                self.errorqueue.put((dstpath, tb))
+                self._num_errors.value += 1
+                msg = '%s\n%s' % (dstpath, tb)
+                print_e(msg)
 
-        self.errorqueue.put(None)
         self.cleanup()
 
 def isfileordir(value):
@@ -107,40 +107,58 @@ def isnotfile(value):
 
 def parse_args():
     parser = \
-        ArgumentParser(description='Convert chatlogs',
-                       prog=PROGNAME)
+        ArgumentParser(description=const.PROGRAM_DESCRIPTION,
+                       prog=const.PROGRAM_NAME)
     parser.add_argument('source', nargs='+', type=isfileordir,
-                        help='source file or directory')
+                        help=_('source file or directory'))
     parser.add_argument('destination', type=isnotfile,
-                        help='destination directory')
+                        help=_('destination directory'))
+    parser.add_argument("-d", "--debug",
+                        help=_("enable debug output"),
+                        action='store_true',
+                        default=False,
+                        )
     parser.add_argument("-f", "--format",
                         choices=formats.output_formats,
-                        help=("format to use for output files"),
+                        help=_("format to use for output files"),
                         default=None,
                         )
     parser.add_argument("-F", "--force",
-                        help=("force regeneration of existing logs at "
-                              "destination"),
+                        help=_("force regeneration of existing logs at "
+                               "destination"),
                         action='store_true',
                         default=False,
                         )
     parser.add_argument("-n", "--dry-run",
-                        help=("perform a trial run with no changes made"),
+                        help=_("perform a trial run with no changes made"),
+                        action='store_true',
+                        default=False,
+                        )
+    parser.add_argument("-q", "--quiet",
+                        help=_("suppress warnings"),
                         action='store_true',
                         default=False,
                         )
     parser.add_argument("-t", "--threads", metavar="NUM_THREADS",
-                        help=("use NUM_THREADS worker processes for parsing"),
+                        help=_("use NUM_THREADS worker processes for parsing"),
                         type=int,
                         default=cpu_count(),
                         )
     parser.add_argument("-v", "--verbose",
-                        help=("enable verbose output"),
+                        help=_("enable verbose output"),
                         action='store_true',
                         default=False,
                         )
 
-    return parser.parse_args()
+    options = parser.parse_args()
+    if options.debug:
+        const.DEBUG = True
+    if options.verbose:
+        const.VERBOSE = True
+    if options.quiet:
+        const.QUIET = True
+
+    return options
 
 fslock = RLock()
 def write_outfile(module, path, tmppath, conversations):
@@ -157,10 +175,9 @@ def write_outfile(module, path, tmppath, conversations):
 def convert(to_write, total, options):
     global WORKERS
     queue = Queue()
-    errorqueue = Queue()
 
-    progress = Progress(total, options)
-    WORKERS = [Parser(queue, errorqueue, options, progress)
+    progress = Progress(total)
+    WORKERS = [Parser(options.destination, queue, progress)
                for i in range(options.threads)]
     for w in WORKERS:
         w.start()
@@ -178,31 +195,33 @@ def main(options):
     src_paths = util.get_paths(options.source)
     dst_paths = util.get_paths([options.destination])
     modules =  [x() for x in formats.all_formats.values()]
+    modules_map = {x.type: x for x in modules}
 
+    print_('analyzing source...', end='', flush=True)
     src_conversations = util.get_conversations(src_paths, modules)
     nsrc = len(src_conversations)
-    print('%i conversation%s found at source' %
-          (nsrc, '' if nsrc == 1 else 's'))
+    print_('\r%i conversation%s found at source' %
+           (nsrc, '' if nsrc == 1 else 's'))
     dst_conversations = util.get_conversations(dst_paths, modules)
     ndst = len(dst_conversations)
-    print('%i conversation%s found at destination' %
-          (ndst, '' if ndst == 1 else 's'))
+    print_('analyzing destination...', end='', flush=True)
+    print_('\r%i conversation%s found at destination' %
+           (ndst, '' if ndst == 1 else 's'))
 
     conversations = [x for x in src_conversations
                      if x not in dst_conversations]
     num_existing = len(src_conversations) - len(conversations)
     if options.force:
         conversations = src_conversations
-    print('converting %i from source (%i already exist at destination)' %
-          (len(conversations), num_existing))
+    print_('converting %i from source (%i already exist at destination)' %
+           (len(conversations), num_existing))
 
     # (dstpath, wmodule): [conversations for dstpath])
     to_write = {}
     for c in conversations:
         rmodule = c.parsedby
-        wmodule = modules[options.format] if options.format else rmodule
-        dstpath = join(options.destination, wmodule.get_path(c))
-        key = (dstpath, wmodule)
+        wmodule = modules_map[options.format] if options.format else rmodule
+        key = (wmodule.get_path(c), wmodule)
         if key not in to_write:
             to_write[key] = []
         to_write[key].append(c)
@@ -210,29 +229,21 @@ def main(options):
     convert(to_write, len(conversations), options)
 
     if not options.verbose:
-        print('')
+        print_('')
     return 0
 
 def abort(*args):
     raise AbortedError
 
 def cleanup(exitcode):
+    num_errors = 0
     for w in WORKERS:
         w.stop()
     for w in WORKERS:
         w.join()
-        errorqueue = w.errorqueue
+        num_errors += w.num_errors
 
-    n = 0
-    errors = []
-    while n < len(WORKERS):
-        item = errorqueue.get_nowait()
-        if item is None:
-            n += 1
-            continue
-        errors.append(item)
-
-    return errors
+    return num_errors
 
 if __name__ == "__main__":
     options = None
@@ -246,17 +257,12 @@ if __name__ == "__main__":
         exitcode = main(options)
     except AbortedError:
         exitcode = 1
-        print("***aborted***", file=sys.stderr)
+        print_e("***aborted***")
     except Exception as e:
         traceback.print_exc()
     finally:
-        errors = cleanup(exitcode)
-        ne = len(errors)
+        ne = cleanup(exitcode)
         if ne:
-            print('\n%i error%s while parsing:' % (ne, '' if ne == 1 else 's'),
-                  file=sys.stderr)
-        for path, error in errors:
-            msg = "%s\n%s" % (path, error)
-            print(msg, file=sys.stderr)
+            print_e('%i error%s' % (ne, '' if ne == 1 else 's'))
 
         sys.exit(ne)

@@ -1,5 +1,4 @@
 from __future__ import unicode_literals
-from __future__ import print_function
 from __future__ import absolute_import
 
 import os
@@ -11,11 +10,11 @@ from dateutil.parser import parse
 from bs4 import BeautifulSoup
 from bs4.element import Tag
 
-from chatlogconv.formats._base import ChatlogFormat
-from chatlogconv import util
-from chatlogconv.errors import ParseError
-from chatlogconv.conversation import Conversation, Message, Status, Event
-from chatlogconv.timezones import getoffset
+from chatlogsync.formats._base import ChatlogFormat
+from chatlogsync import util
+from chatlogsync.errors import ParseError
+from chatlogsync.conversation import Conversation, Message, Status, Event
+from chatlogsync.timezones import getoffset
 
 class Adium(ChatlogFormat):
     type = 'adium'
@@ -33,12 +32,10 @@ class Adium(ChatlogFormat):
                       'available': Status.AVAILABLE,
                       'chat-error': Status.CHATERROR,
                       }
-    PAMEPYT_SUTATS = {v: k for (k, v) in iter(STATUS_TYPEMAP.items())}
 
     EVENT_TYPEMAP = {'windowClosed': Event.WINDOWCLOSED,
                      'windowOpened': Event.WINDOWOPENED,
                      }
-    PAMEPYT_TNEVE = {v: k for (k, v) in iter(EVENT_TYPEMAP.items())}
 
     FILE_PATTERN = ('Logs/<service>.<source>/'
                     '<destination>/'
@@ -70,7 +67,7 @@ class Adium(ChatlogFormat):
 
         # parse xml
         with open(path) as f:
-            soup = BeautifulSoup(f, 'xml')
+            soup = BeautifulSoup(f, ['lxml', 'xml'])
         chat = soup.find('chat')
         for e in chat.children:
             if not isinstance(e, Tag):
