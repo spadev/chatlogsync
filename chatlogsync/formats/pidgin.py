@@ -66,7 +66,8 @@ class PidginHtml(ChatlogFormat):
 
         conversation = Conversation(self, path, info['source'],
                                     info['destination'],
-                                    info['service'], info['time'])
+                                    info['service'], info['time'],
+                                    [], [])
         if not messages:
             return [conversation]
 

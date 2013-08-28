@@ -35,7 +35,7 @@ def _validate_argument(arg, argname, cls):
 class Conversation(object):
     """Object representing a converation from a chatlog"""
     def __init__(self, parsedby, path, source, destination,
-                 service, time, entries=[], images=[]):
+                 service, time, entries, images):
         self._source = source
         self._destination = destination
         self._service = service

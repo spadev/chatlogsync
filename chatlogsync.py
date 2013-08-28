@@ -214,7 +214,7 @@ def main(options):
     num_existing = len(src_conversations) - len(conversations)
     if options.force:
         conversations = src_conversations
-    print_('converting %i from source (%i already exist at destination)' %
+    print_('converting %i from source (%i already at destination)' %
            (len(conversations), num_existing))
 
     # (dstpath, wmodule): [conversations for dstpath])

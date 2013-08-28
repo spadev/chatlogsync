@@ -61,7 +61,7 @@ class Adium(ChatlogFormat):
                   if not x.endswith('.xml')]
 
         conversation = Conversation(self, path, source, destination,
-                                    service, time, images=images)
+                                    service, time, entries=[], images=images)
         if not messages:
             return [conversation]
 
@@ -69,6 +69,7 @@ class Adium(ChatlogFormat):
         with open(path) as f:
             soup = BeautifulSoup(f, ['lxml', 'xml'])
         chat = soup.find('chat')
+
         for e in chat.children:
             if not isinstance(e, Tag):
                 continue
@@ -99,9 +100,8 @@ class Adium(ChatlogFormat):
             try:
                 conversation.entries.append(cons(**attrs))
             except StandardError as err:
-                print_e("Problem with entry %s" % e)
+                print_e("Problem with element %s" % e)
                 raise err
-
 
         csource = chat.get('account')
         cservice = self.SERVICE_MAP[chat.get('service')]
