@@ -12,7 +12,7 @@ from multiprocessing import Process, Queue, cpu_count, RLock, Value
 
 import chatlogsync
 from chatlogsync import const, formats, util
-from chatlogsync.errors import AbortedError, ParseError
+from chatlogsync.errors import AbortedError
 
 WORKERS = []
 
@@ -74,10 +74,10 @@ class Parser(Process):
                     dst_conversations = []
                     for c in src_conversations:
                         dst_conversations.extend(wmodule.parse(c.path))
-                tmppath = dstpath+'.tmp'
 
-                self.tempfiles.append(tmppath)
                 realdstpath = join(self.destination, dstpath)
+                tmppath = realdstpath+'.tmp'
+                self.tempfiles.append(tmppath)
                 write_outfile(wmodule, realdstpath,
                               tmppath, dst_conversations)
                 del self.tempfiles[-1]
@@ -162,6 +162,7 @@ def parse_args():
 
 fslock = RLock()
 def write_outfile(module, path, tmppath, conversations):
+    # return len(conversations)
     dstdir = dirname(path)
     with fslock:
         if not exists(dstdir):

@@ -61,7 +61,7 @@ class Adium(ChatlogFormat):
                   if not x.endswith('.xml')]
 
         conversation = Conversation(self, path, source, destination,
-                                    service, time, images)
+                                    service, time, images=images)
         if not messages:
             return [conversation]
 
@@ -73,32 +73,35 @@ class Adium(ChatlogFormat):
             if not isinstance(e, Tag):
                 continue
 
-            alias = e.get('alias')
-            sender = e.get('sender')
-            timestr = e.get('time')
-            if timestr:
-                time = parse(timestr, default=conversation.time,
-                             ignoretz=True)
-            else:
-                time = None
-            html =  list(e.children)
-            type_attr = e.get('type')
+            attrs = {}
+            for a in ('alias', 'sender', 'auto', 'time'):
+                attrs[a] = e.get(a, '')
+            attrs['auto'] = True if attrs['auto'] else False
+            if attrs['time']:
+                attrs['time'] = parse(attrs['time'], default=conversation.time,
+                                      ignoretz=True)
+            attrs['html'] =  list(e.children)
 
             if e.name == 'status':
-                type = self.STATUS_TYPEMAP.get(type_attr, None)
-                if not type:
-                    raise ParseError("unknown type '%s' for status" % type_attr)
-                entry = Status(alias, sender, time, type, html=html)
+                cons = Status
+                attrs['type'] = self.STATUS_TYPEMAP.get(e.get('type'), None)
             elif e.name == 'event':
-                type = self.EVENT_TYPEMAP.get(type_attr, None)
-                if not type:
-                    raise ParseError("unknown type '%s' for event" % type_attr)
-                entry = Event(alias, sender, time, type, html=html)
+                cons = Event
+                attrs['type'] = self.EVENT_TYPEMAP.get(e.get('type'), None)
             elif e.name == 'message':
-                entry = Message(alias, sender, time, html=html)
+                cons = Message
             else:
                 raise ParseError("unknown type '%s' for entry" % e.name)
-            conversation.entries.append(entry)
+
+            if not attrs['sender'] and not attrs['alias']:
+                print_d("%s is a system entry" % e)
+                attrs['system'] = True
+            try:
+                conversation.entries.append(cons(**attrs))
+            except StandardError as err:
+                print_e("Problem with entry %s" % e)
+                raise err
+
 
         csource = chat.get('account')
         cservice = self.SERVICE_MAP[chat.get('service')]
@@ -124,52 +127,45 @@ class Adium(ChatlogFormat):
         chat.append('\n')
 
         for i, entry in enumerate(conversation.entries):
+            attrs = dict(alias=entry.alias, sender=entry.sender)
             if isinstance(entry, Message):
                 name = 'message'
+                if entry.auto:
+                    attrs['auto'] = "true"
             elif isinstance(entry, Status):
                 name = 'status'
+                attrs['type'] = self.PAMEPYT_SUTATS[entry.type]
             elif isinstance(entry, Event):
                 name = 'event'
-            elem = soup.new_tag(name=name)
+                attrs['type'] = self.PAMEPYT_TNEVE[entry.type]
+            if entry.system: # no alias or sender for these
+                del attrs['alias']
+                del attrs['sender']
+            elem = soup.new_tag(name=name, **attrs)
 
-            for k in ('alias', 'sender'):
-                v = getattr(entry, k)
-                if v:
-                    elem[k] = v
-
-            if entry.type:
-                if isinstance(entry, Status):
-                    t = self.PAMEPYT_SUTATS[entry.type]
-                elif isinstance(entry, Event):
-                    t = self.PAMEPYT_TNEVE[entry.type]
-                elem['type'] = t
-
-            if entry.time:
-                f1 = self.TIME_FMT_CONVERSATION[:-2]
-                f2 = self.TIME_FMT_CONVERSATION[-2:]
-                v1 = entry.time.strftime(f1)
-                v2 = entry.time.strftime(f2)
-                v = v1+v2[:3]+':'+v2[3:]
-                elem['time'] = v
-
-            for html in entry.html:
-                elem.append(html)
+            f1 = self.TIME_FMT_CONVERSATION[:-2]
+            f2 = self.TIME_FMT_CONVERSATION[-2:]
+            v1 = entry.time.strftime(f1)
+            v2 = entry.time.strftime(f2)
+            v = v1+v2[:3]+':'+v2[3:]
+            elem['time'] = v
 
             if not entry.html:
                 elem.append(entry.text)
+            else:
+                for html in entry.html:
+                    elem.append(html)
 
             chat.append(elem)
             if i != len(conversation.entries)-1:
                 chat.append('\n')
 
         # images
-        for img_relpath in conversation.images:
-            srcdir = dirname(conversation.path)
-            dstdir = dirname(path)
-            srcimg = join(srcdir, img_relpath)
-            dstimg = join(dstdir, img_relpath)
-            if realpath(srcimg) != realpath(dstimg):
-                shutil.copy(srcimg, dstimg)
+        dstdir = dirname(path)
+        for img_relpath, srcpath in conversation.images_full:
+            dstpath = join(dstdir, img_relpath)
+            if srcpath != realpath(dstpath):
+                shutil.copy(srcpath, dstpath)
 
         # newline at end
         soup.append('\n')
