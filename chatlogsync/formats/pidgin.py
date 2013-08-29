@@ -1,7 +1,7 @@
 from __future__ import unicode_literals
 from __future__ import absolute_import
 
-#TODO: add support for multi-user chats
+# TODO: add support for multi-user chats
 
 import re
 import sys
@@ -146,7 +146,7 @@ class PidginHtml(ChatlogFormat):
                     # default to destination if no sender
                     attrs['sender'] = conversation.destination
             if not attrs['alias']:
-                attrs['alias'] = aliases_by_sender.get(attrs['sender'], None)
+                attrs['alias'] = aliases_by_sender.get(attrs['sender'], '')
             if attrs['sender'] == attrs['alias']:
                 attrs['alias'] = ''
             entries.append(cons(**attrs))

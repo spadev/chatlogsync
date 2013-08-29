@@ -162,7 +162,7 @@ def parse_args():
 
 fslock = RLock()
 def write_outfile(module, path, tmppath, conversations):
-    # return len(conversations)
+    return len(conversations)
     dstdir = dirname(path)
     with fslock:
         if not exists(dstdir):
