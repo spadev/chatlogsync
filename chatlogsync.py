@@ -21,14 +21,14 @@ class Progress(object):
         self._nread = Value('i', 0, lock=False)
         self._nwrote = Value('i', 0, lock=False)
         self._nexisting = Value('i', 0, lock=False)
-        self._nerrors = Value('i', 0, lock=False)
+        self._nerror = Value('i', 0, lock=False)
         self._lock = Lock()
 
     def print_status(self, msg):
         dryrun = ' (DRY RUN)' if const.DRYRUN else ''
         print_v(msg)
-        print_('\r[read:%i wrote:%i existing:%i errors:%i]%s ' %
-               (self.nread, self.nwrote, self.nexisting, self.nerrors, dryrun),
+        print_('\r[read:%i wrote:%i existing:%i error:%i]%s ' %
+               (self.nread, self.nwrote, self.nexisting, self.nerror, dryrun),
                end='', flush=True)
         print_v('\n')
 
@@ -45,7 +45,7 @@ class Progress(object):
 
     def error(self, path):
         tb = traceback.format_exc()
-        self._incr(self._nerrors)
+        self._incr(self._nerror)
         print_e('%s\n%s' % (path, tb))
 
     def existing(self, path):
@@ -53,8 +53,8 @@ class Progress(object):
         print_v('existing %s' % path)
 
     @property
-    def nerrors(self):
-        return self._nerrors.value
+    def nerror(self):
+        return self._nerror.value
     @property
     def nwrote(self):
         return self._nwrote.value
@@ -283,7 +283,7 @@ def cleanup(exitcode):
     if not const.VERBOSE:
         print_('')
 
-    return progress.nerrors + exitcode
+    return progress.nerror + exitcode
 
 if __name__ == "__main__":
     options = None
