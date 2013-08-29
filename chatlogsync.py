@@ -20,15 +20,15 @@ class Progress(object):
     def __init__(self):
         self._nread = Value('i', 0, lock=False)
         self._nwrote = Value('i', 0, lock=False)
-        self._nskipped = Value('i', 0, lock=False)
+        self._nexisting = Value('i', 0, lock=False)
         self._nerrors = Value('i', 0, lock=False)
         self._lock = Lock()
 
     def print_status(self, msg):
         dryrun = ' (DRY RUN)' if const.DRYRUN else ''
         print_v(msg)
-        print_('\r[read:%i wrote:%i skipped:%i errors:%i]%s ' %
-               (self.nread, self.nwrote, self.nskipped, self.nerrors, dryrun),
+        print_('\r[read:%i wrote:%i existing:%i errors:%i]%s ' %
+               (self.nread, self.nwrote, self.nexisting, self.nerrors, dryrun),
                end='', flush=True)
         print_v('\n')
 
@@ -48,9 +48,9 @@ class Progress(object):
         self._incr(self._nerrors)
         print_e('%s\n%s' % (path, tb))
 
-    def skipped(self, path):
-        self._incr(self._nskipped)
-        print_v('skipped %s' % path)
+    def existing(self, path):
+        self._incr(self._nexisting)
+        print_v('existing %s' % path)
 
     @property
     def nerrors(self):
@@ -62,8 +62,8 @@ class Progress(object):
     def nread(self):
         return self._nread.value
     @property
-    def nskipped(self):
-        return self._nskipped.value
+    def nexisting(self):
+        return self._nexisting.value
 
 class Parser(Process):
     def __init__(self, outformat, force, destination, queue, files,
@@ -124,9 +124,10 @@ class Parser(Process):
                 else:
                     f = 0
                 self._files[real_dstpath] = f
-                if f and not self.force:
-                    self.progress.skipped(dstpath)
-                    continue
+                if f:
+                    self.progress.existing(dstpath)
+                    if not self.force:
+                        continue
             if const.DRYRUN:
                 conversation = c
             else:
@@ -231,6 +232,8 @@ def parse_args():
         const.VERBOSE = True
     if options.quiet:
         const.QUIET = True
+    if options.dry_run:
+        const.DRYRUN = True
 
     return options
 
