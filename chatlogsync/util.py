@@ -33,23 +33,6 @@ def parse_string(string, pattern):
 
     return results
 
-def get_conversations(paths, modules):
-    conversations = set()
-
-    for path in paths:
-        for i, m in enumerate(modules):
-            parsed = m.parse_path(path)
-            if parsed:
-                for c in parsed:
-                    conversations.add(c)
-                if i != 0:
-                    # try this module first next time
-                    modules[i] = modules[0]
-                    modules[0] = m
-                break
-
-    return conversations
-
 def get_paths(paths):
     newpaths = set()
     for path in paths:
