@@ -28,7 +28,7 @@ def parse_string(string, pattern):
     for key, value in iter(s.groupdict().items()):
         k = re.sub('\d', '', key)
         if k in results and results[k] != value:
-            raise ParseError('Problem parsing string %s' % string)
+            raise ParseError("Problem parsing string '%s'" % string)
         results[k] = value
 
     return results
@@ -38,7 +38,7 @@ def get_conversations(paths, modules):
 
     for path in paths:
         for i, m in enumerate(modules):
-            parsed = m.parse(path, messages=False)
+            parsed = m.parse_path(path)
             if parsed:
                 for c in parsed:
                     conversations.add(c)

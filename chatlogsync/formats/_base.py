@@ -42,7 +42,14 @@ class ChatlogFormat(object):
 
         return ''.join(s)
 
-    def parse(self, path, messages=True):
+    def parse_path(self, path):
+        """Parse path and return list of conversations without
+        entries filled in."""
+        raise NotImplementedError
+
+    def parse_conversation(self, conversation):
+        """Fill in entries of conversation.
+        Return modifeid conversation."""
         raise NotImplementedError
 
     def write(self, path, conversations):

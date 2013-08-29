@@ -52,7 +52,7 @@ class PidginHtml(ChatlogFormat):
 
     TIME_REGEX = re.compile('([+-]\d+)([^0-9- ]+)')
 
-    def parse(self, path, messages=True):
+    def parse_path(self, path):
         info = util.parse_string(path, self.FILE_PATTERN)
         if not info:
             return None
@@ -68,11 +68,11 @@ class PidginHtml(ChatlogFormat):
                                     info['destination'],
                                     info['service'], info['time'],
                                     [], [])
-        if not messages:
-            return [conversation]
 
-        # parse html
-        with codecs.open(path, encoding='utf-8') as f:
+        return [conversation]
+
+    def parse_conversation(self, conversation):
+        with codecs.open(conversation.path, encoding='utf-8') as f:
             lines = f.read().strip().split('<br/>\n')
         title_line, first_line = lines[0].split('\n', 1)
         lines[0] = first_line
@@ -134,7 +134,7 @@ class PidginHtml(ChatlogFormat):
         conversation.entries = \
             self._get_entries(conversation, senders_by_alias, attrs_list)
 
-        return [conversation]
+        return conversation
 
     def _get_entries(self, conversation, senders_by_alias, attrs_list):
         aliases_by_sender = {v: k for k, v in iter(senders_by_alias.items())}
@@ -193,7 +193,7 @@ class PidginHtml(ChatlogFormat):
                 attrs['alias'] = m.group('alias')
                 attrs['auto'] = True
         else:
-            raise ParseError('Unexpected <font> found at line %s' % line)
+            raise ParseError("unexpected <font> found at line '%s'" % line)
         timestr = timestr[1:-1] # '(10:10:10)'
         attrs['time'] = parse(timestr, default=conversation.time,
                               ignoretz=True)
@@ -249,11 +249,15 @@ class PidginHtml(ChatlogFormat):
 
     def write(self, path, conversations):
         if len(conversations) != 1:
-            msg = '%s only supports one conversation per file:\n  %s has %i' % \
-                (self.type, path, len(conversations))
-            raise ParseError(msg)
+            raise ParseError(
+                ("'%s' only supports one conversation "
+                 "per file:\n  '%s' has %i") % (self.type, path,
+                                                len(conversations))
+                )
 
         conversation = conversations[0]
+        soup = BeautifulSoup(features='html')
+
         raise NotImplementedError
 
 formats = [PidginHtml]

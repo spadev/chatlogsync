@@ -28,9 +28,10 @@ from chatlogsync.errors import ArgumentError
 from chatlogsync.formats._base import ChatlogFormat
 
 def _validate_argument(arg, argname, cls):
-    msg = "Incorrect argument type for %s:\n  %s is a %s, but expected a %s"
+    msg = "expected a '%s' for argument '%s' - '%s' is a '%s'"
     if not isinstance(arg, cls):
-        raise ArgumentError(msg % (argname, arg, type(arg), cls))
+        raise TypeError(msg % (cls.__name__, argname,
+                               arg, type(arg).__name__))
 
 class Conversation(object):
     """Object representing a converation from a chatlog"""
@@ -45,7 +46,7 @@ class Conversation(object):
         for argname in ('source', 'destination', 'service', 'path'):
             _validate_argument(getattr(self, '_'+argname), argname, basestring)
         if not isfile(self._path):
-            raise ArgumentError('Path %s does not exist' % path)
+            raise ArgumentError("path '%s' does not exist" % path)
         _validate_argument(parsedby, 'parsedby', ChatlogFormat)
         self.__validate_time(time)
         self.__validate_images(images)
@@ -162,7 +163,7 @@ class Entry(object):
             _validate_argument(getattr(self, '_'+argname), argname, basestring)
 
         if not self._alias and not self._sender and not self._system:
-            raise ArgumentError('Non-system Entry must have sender or alias')
+            raise ArgumentError('non-system Entry must have sender or alias')
         elif self._alias == self._sender:
             self._alias = ''
         _validate_argument(self._time, 'time', datetime.datetime)
@@ -242,7 +243,7 @@ class Status(Entry):
     def __init__(self,  **kwargs):
         atype = kwargs.get('type', None)
         if atype < self._MIN or atype > self._MAX:
-            raise ArgumentError("unknown type '%s' for status" % atype)
+            raise TypeError("unknown type '%s' for status" % atype)
         self._type = atype
 
         super(Status, self).__init__(**kwargs)
@@ -262,7 +263,7 @@ class Event(Entry):
     def __init__(self, **kwargs):
         atype = kwargs.get('type', None)
         if atype < self._MIN or atype > self._MAX:
-            raise ArgumentError("unknown type '%s' for event" % atype)
+            raise TypeError("unknown type '%s' for event" % atype)
         self._type = atype
 
         super(Event, self).__init__(**kwargs)

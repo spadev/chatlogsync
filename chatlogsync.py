@@ -71,9 +71,8 @@ class Parser(Process):
                 if const.DRYRUN:
                     dst_conversations = src_conversations
                 else:
-                    dst_conversations = []
-                    for c in src_conversations:
-                        dst_conversations.extend(wmodule.parse(c.path))
+                    dst_conversations = [wmodule.parse_conversation(c)
+                                         for c in src_conversations]
 
                 realdstpath = join(self.destination, dstpath)
                 tmppath = realdstpath+'.tmp'
@@ -95,13 +94,13 @@ class Parser(Process):
 
 def isfileordir(value):
     if not isfile(value) and not isdir(value):
-        raise ArgumentTypeError('%s is not a file or directory' % value)
+        raise ArgumentTypeError("'%s' is not a file or directory" % value)
 
     return value
 
 def isnotfile(value):
     if isfile(value):
-        raise ArgumentTypeError('%s is not a file' % value)
+        raise ArgumentTypeError("'%s' is not a file" % value)
 
     return value
 
@@ -162,7 +161,7 @@ def parse_args():
 
 fslock = RLock()
 def write_outfile(module, path, tmppath, conversations):
-    return len(conversations)
+    # return len(conversations)
     dstdir = dirname(path)
     with fslock:
         if not exists(dstdir):
