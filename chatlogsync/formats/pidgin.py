@@ -67,7 +67,7 @@ class PidginHtml(ChatlogFormat):
         info['time'] = self.TIME_REGEX.sub(r'\2 \1', timestr)
         self._parse_info(info)
         if info['destination'] == '.system':
-            print_w('Ignoring system log %s' % path)
+            print_d('Ignoring system log %s' % path)
             return None
 
         conversation = Conversation(self, path, info['source'],
@@ -230,7 +230,7 @@ class PidginHtml(ChatlogFormat):
             self._parse_status(attrs, conversation,
                                attrs['color'] == self.ERROR_COLOR)
             if not attrs['type']:
-                print_w("No type found for status '%s': using purple"
+                print_d("No type found for status '%s': using purple"
                         % line)
                 attrs['type'] = Status.PURPLE
 
