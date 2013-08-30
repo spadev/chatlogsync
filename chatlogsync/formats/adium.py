@@ -159,6 +159,8 @@ class Adium(ChatlogFormat):
             if entry.system: # no alias or sender for these
                 del attrs['alias']
                 del attrs['sender']
+            elif not attrs['alias']:
+                del attrs['alias']
             elem = soup.new_tag(name=name, **attrs)
 
             f1 = self.TIME_FMT_CONVERSATION[:-2]
