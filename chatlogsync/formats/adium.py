@@ -19,7 +19,8 @@ from chatlogsync.timezones import getoffset
 class Adium(ChatlogFormat):
     type = 'adium'
     SERVICE_MAP = {'GTalk' : 'gtalk',
-                   'AIM' : 'aim'
+                   'AIM' : 'aim',
+                   'Facebook' : 'facebook',
                    }
 
     STATUS_TYPEMAP = {'offline': Status.OFFLINE,

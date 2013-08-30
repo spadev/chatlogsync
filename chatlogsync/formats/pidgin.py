@@ -22,10 +22,13 @@ from chatlogsync.timezones import getoffset
 class PidginHtml(ChatlogFormat):
     type = 'pidgin-html'
     SERVICE_MAP = {'jabber': 'jabber',
-                   'aim': 'aim'}
+                   'aim': 'aim',
+                   }
     PAM_ECIVRES = {'gtalk': 'jabber',
                    'jabber': 'jabber',
-                   'aim': 'aim'}
+                   'facebook': 'jabber',
+                   'aim': 'aim',
+                   }
     FILE_PATTERN = 'logs/<service>/<source>/<destination>/<time>.html'
     TIME_FMT_FILE = '%Y-%m-%d.%H%M%S%z%Z'
     TITLE_PATTERN = _("Conversation with <destination> "
@@ -35,6 +38,9 @@ class PidginHtml(ChatlogFormat):
     DESTINATION_COLOR = "#A82F2F"
     ERROR_COLOR = "#FF0000"
     DELAYED_COLOR = "#062585"
+
+    TIME_FMT_CONVERSATION = "(%X)"
+
     STATUS_TYPEMAP = {_("<alias> has gone away."): Status.AWAY,
                       _("<alias> is no longer <type>."): Status.AVAILABLE,
                       _("<alias> has signed off."): Status.OFFLINE,
@@ -175,16 +181,23 @@ class PidginHtml(ChatlogFormat):
         if len(soup) == 0:
             print_d("Skipping line %s" % line)
             return None, None
+
         elem = soup.find('font')
         attrs['color'] = elem.get('color')
         if attrs['color'] == self.DELAYED_COLOR:
             attrs['delayed'] = True
+
         if elem.has_attr('size'):
+            cons = Status
+            tag_before_msg = elem
             timestr = elem.text
         elif attrs['color'] == self.ERROR_COLOR:
-            timestr = elem.find('font').text
+            cons = Status
+            timetag = elem.find('font')
+            timestr = timetag.text
             attrs['type'] = Status.CHATERROR
         elif attrs['color']:
+            cons = Message
             timestr = elem.find('font').text
             attrs['sender'] = senders_by_color.get(attrs['color'])
             attrs['alias'] = elem.find('b').text[:-1] # trailing ':'
@@ -201,12 +214,9 @@ class PidginHtml(ChatlogFormat):
         # message
         if attrs['color'] and attrs['color'] != self.ERROR_COLOR:
             html = [e for e in elem.nextSiblingGenerator()]
-            cons = Message
-        else: # status
-            html = [NavigableString(''.join(e.stripped_strings))
-                    if isinstance(e, Tag)
-                    else e.string for e in elem.nextSiblingGenerator()]
-            cons = Status
+        # status: html in <b> tag
+        else:
+            html = list(soup.find('b').children)
 
         if html and isinstance(html[0], NavigableString):
             s = html[0].lstrip()
@@ -227,7 +237,8 @@ class PidginHtml(ChatlogFormat):
         return (cons, attrs)
 
     def _parse_status(self, info, conversation, error=False):
-        s = ''.join(info['html'])
+        s = ''.join([x.text if isinstance(x, Tag) else x.string
+                     for x in info['html']])
         info['sender'] = conversation.source \
             if s.startswith(_("You")) else None
         if error:
@@ -257,7 +268,87 @@ class PidginHtml(ChatlogFormat):
 
         conversation = conversations[0]
         soup = BeautifulSoup(features='html')
+        html = soup.new_tag(name='html')
+        head = soup.new_tag(name='head')
+        body = soup.new_tag(name='body')
+        attrs = {'http-equiv': 'content-type',
+                 'content': 'text/html; charset=UTF-8'}
+        meta = soup.new_tag(name='meta', **attrs)
+        h3 = soup.new_tag(name='h3')
+        title = soup.new_tag(name='title')
 
-        raise NotImplementedError
+        titlestr = self.fill_pattern(conversation, self.TITLE_PATTERN)
+
+        soup.append(html)
+
+        html.append(head)
+        html.append(body)
+
+        head.append(meta)
+        head.append(title)
+
+        body.append(h3)
+        body.append('\n')
+
+        h3.append(titlestr)
+        title.append(titlestr)
+
+        for entry in conversation.entries:
+            if self._append_html(entry, body, conversation, soup):
+                body.append(soup.new_tag(name='br'))
+                body.append('\n')
+
+        # newline at end
+        soup.append('\n')
+        with codecs.open(path, 'wb', 'utf-8') as fh:
+            fh.write(soup.decode())
+
+    def _append_html(self, entry, body, conversation, soup):
+        timefmt = self.TIME_FMT_CONVERSATION
+        if isinstance(entry, Message):
+            if entry.delayed:
+                color = self.DELAYED_COLOR
+            elif entry.sender == conversation.source:
+                color = self.SOURCE_COLOR
+            else:
+                color = self.DESTINATION_COLOR
+            f = soup.new_tag(name='font', color=color)
+            timetag = soup.new_tag(name='font', size=2)
+            timetag.append(entry.time.strftime(timefmt))
+            nametag = soup.new_tag(name='b')
+            nametag.append('%s:' % (entry.alias if entry.alias
+                                    else entry.sender))
+            f.append(timetag)
+            f.append(' ')
+            f.append(nametag)
+
+            body.append(f)
+            body.append(' ')
+            for e in entry.html:
+                body.append(e)
+        elif isinstance(entry, Status):
+            # error:
+            # <font color="#FF0000"><font size="2">(_time)</font><b> _msg</b></font>
+            # normal:
+            # <font size="2">(_time)</font><b> _msg</b>
+            msgtag = soup.new_tag(name='b')
+            timetag = soup.new_tag(name='font', size=2)
+
+            timetag.append(entry.time.strftime(timefmt))
+
+            msgtag.append(' ')
+            msgtag.append(entry.text)
+            if entry.type == Status.CHATERROR:
+                color = self.ERROR_COLOR
+                f = soup.new_tag(name='font', color=color)
+                f.append(timetag)
+                f.append(msgtag)
+                body.append(f)
+            else:
+                body.append(timetag)
+                body.append(msgtag)
+        else:
+            return False
+        return True
 
 formats = [PidginHtml]

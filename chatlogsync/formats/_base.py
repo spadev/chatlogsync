@@ -27,11 +27,16 @@ class ChatlogFormat(object):
                                   iter(self.EVENT_TYPEMAP.items())}
 
     def get_path(self, conversation):
-        if (not self.FILE_PATTERN or not self.SERVICE_MAP
-            or not self.TIME_FMT_FILE):
+        if not self.FILE_PATTERN:
             raise NotImplementedError
 
-        s = re.split('<(.*?)>', self.FILE_PATTERN)
+        return self.fill_pattern(conversation, self.FILE_PATTERN)
+
+    def fill_pattern(self, conversation, pattern):
+        if (not self.SERVICE_MAP or not self.TIME_FMT_FILE):
+            raise NotImplementedError
+
+        s = re.split('<(.*?)>', pattern)
         for i in range(1, len(s), 2):
             a = getattr(conversation, s[i])
             if s[i] == 'service':

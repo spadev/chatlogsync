@@ -152,6 +152,7 @@ class Entry(object):
         self._sender = ''
         self._text = ''
         self._time = ''
+        self._delayed = False
         self._html = []
 
         for k, v in iter(kwargs.items()):
@@ -186,6 +187,9 @@ class Entry(object):
     @property
     def system(self):
         return self._system
+    @property
+    def delayed(self):
+        return self._delayed
 
     @property
     def text(self):
