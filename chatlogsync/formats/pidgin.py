@@ -37,7 +37,7 @@ class PidginHtml(ChatlogFormat):
     SOURCE_COLOR = "#16569E"
     DESTINATION_COLOR = "#A82F2F"
     ERROR_COLOR = "#FF0000"
-    DELAYED_COLOR = "#062585"
+    ALTERNATE_COLOR = "#062585"
 
     TIME_FMT_CONVERSATION = "(%X)"
     TIME_FMT_CONVERSATION_WITH_DATE = "(%x %X)"
@@ -115,7 +115,7 @@ class PidginHtml(ChatlogFormat):
             if not attrs:
                 continue
 
-            if attrs['time'] < prev_time:
+            if attrs['time'] < prev_time and not attrs['delayed']:
                 attrs['time'] += datetime.timedelta(days=1)
             prev_time = attrs['time']
 
@@ -192,8 +192,8 @@ class PidginHtml(ChatlogFormat):
 
         fonttag = soup.font
         attrs['color'] = fonttag.get('color')
-        if attrs['color'] == self.DELAYED_COLOR:
-            attrs['delayed'] = True
+        if attrs['color'] == self.ALTERNATE_COLOR:
+            attrs['alternate'] = True
 
         if fonttag.has_attr('size'):
             cons = Status
@@ -213,8 +213,19 @@ class PidginHtml(ChatlogFormat):
                 attrs['auto'] = True
         else:
             raise ParseError("unexpected <font> found at line '%s'" % line)
-        timestr = timestr[1:-1] # '(10:10:10)'
-        attrs['time'] = parse(timestr, default=base_time, ignoretz=True)
+        # normal -> (10:10:10)
+        # delayed -> (2010-12-12 10:10:10)
+        timestr = timestr[1:-1]
+        parsed = parse(timestr, default=datetime.datetime.min, ignoretz=True)
+        if parsed.date() == datetime.date.min:
+            attrs['delayed'] = False
+            attrs['time'] = parsed.replace(day=base_time.day,
+                                           month=base_time.month,
+                                           year=base_time.year,
+                                           tzinfo=base_time.tzinfo)
+        else:
+            attrs['delayed'] = True
+            attrs['time'] = parsed.replace(tzinfo=base_time.tzinfo)
 
         # isuser
         color = attrs['color']
@@ -309,17 +320,9 @@ class PidginHtml(ChatlogFormat):
         h3.append(titlestr)
         title.append(titlestr)
 
-        # prev_date = conversation.entries[0].time.date() \
-        #     if conversation.entries else None
-
         for entry in conversation.entries:
-            # cur_date = entry.time.date()
-            # if cur_date > prev_date:
-            #     timefmt = self.TIME_FMT_CONVERSATION_WITH_DATE
-            # else:
-            #     timefmt = self.TIME_FMT_CONVERSATION
-            # prev_date = cur_date
-            timefmt = self.TIME_FMT_CONVERSATION
+            timefmt = self.TIME_FMT_CONVERSATION_WITH_DATE if entry.delayed \
+                else self.TIME_FMT_CONVERSATION
             if self._append_html(entry, body, conversation, soup, timefmt):
                 body.append(soup.new_tag(name='br'))
                 body.append('\n')
@@ -331,8 +334,8 @@ class PidginHtml(ChatlogFormat):
 
     def _append_html(self, entry, body, conversation, soup, timefmt):
         if isinstance(entry, Message):
-            if entry.delayed:
-                color = self.DELAYED_COLOR
+            if entry.alternate:
+                color = self.ALTERNATE_COLOR
             elif entry.isuser:
                 color = self.SOURCE_COLOR
             else:

@@ -173,6 +173,7 @@ class Entry(object):
         self._text = ''
         self._time = ''
         self._delayed = False
+        self._alternate = False
         self._html = []
         self._isuser = False
 
@@ -211,6 +212,9 @@ class Entry(object):
     @property
     def delayed(self):
         return self._delayed
+    @property
+    def alternate(self):
+        return self._alternate
     @property
     def isuser(self):
         return self._isuser
