@@ -33,8 +33,25 @@ def _validate_argument(arg, argname, cls):
         raise TypeError(msg % (cls.__name__, argname,
                                arg, type(arg).__name__))
 
+def _get_text(html):
+    strings = []
+    for x in html:
+        if isinstance(x, NavigableString):
+            strings.append(x.string)
+        else:
+            # links should always contain the url
+            if x.name == 'a':
+                if x.text != x['href']:
+                    s = '<%s %s>' % (x.text, x['href'])
+                else:
+                    s = '<%s>' % (x['href'])
+            else:
+                s = x.text
+            strings.append(s)
+    return ''.join(strings)
+
 class Conversation(object):
-    """Object representing a converation from a chatlog"""
+    """Object representing a conversation from a chatlog"""
     def __init__(self, parsedby, path, source, destination,
                  service, time, entries, images):
         self._source = source
@@ -118,6 +135,9 @@ class Conversation(object):
 
         self._time = t
 
+    def __repr__(self):
+        return "%s(%r)" % (self.__class__, self.__dict__)
+
     def __str__(self):
         s = 'source: %s, destination: %s, service: %s, time: %s' % \
             (self.source, self.destination, self.service, self.time)
@@ -154,6 +174,7 @@ class Entry(object):
         self._time = ''
         self._delayed = False
         self._html = []
+        self._isuser = False
 
         for k, v in iter(kwargs.items()):
             setattr(self, '_'+k, v)
@@ -190,32 +211,26 @@ class Entry(object):
     @property
     def delayed(self):
         return self._delayed
+    @property
+    def isuser(self):
+        return self._isuser
 
     @property
     def text(self):
         if not self._text and self.html:
-            strings = []
-            for x in self.html:
-                if isinstance(x, NavigableString):
-                    strings.append(x.string)
-                else:
-                    # links should always contain the url
-                    if x.name == 'a':
-                        if x.text != x['href']:
-                            s = '<%s %s>' % (x.text, x['href'])
-                        else:
-                            s = '<%s>' % (x['href'])
-                    else:
-                        s = x.text
-                    strings.append(s)
-
-            self._text = ''.join(strings)
-
+            self._text = _get_text(self.html)
         return self._text
+
+    def __repr__(self):
+        return "%s(%r)" % (self.__class__, self.__dict__)
 
     def __str__(self):
         t = self.time.strftime('%X') if self.time else ''
-        s = '%s (%s) [%s]: %s' % (self.sender, self.alias, t, self.text)
+        if self.alias:
+            sa = '%s (%s)' % (self.alias, self.sender)
+        else:
+            sa = str(self.sender)
+        s = '%s [%s]: %s' % (sa, t, self.text)
 
         return s
 
@@ -229,22 +244,46 @@ class Message(Entry):
     def auto(self):
         return self._auto
 
+    def __str__(self):
+        s = super(Message, self).__str__()
+        if self.auto:
+            s = '*auto-reply* '+s
+
+        return s
+
 class Status(Entry):
     """Immutable object representing a status in a Conversation"""
     OFFLINE = 1
     ONLINE = 2
-    DISCONNECTED = 3
-    CONNECTED = 4
-    AVAILABLE = 5
-    AWAY = 6
-    IDLE = 7
+    AVAILABLE = 3
+    AWAY = 4
+    IDLE = 5
+    DISCONNECTED = 6
+    CONNECTED = 7
     CHATERROR = 8
     PURPLE = 9
 
     _MIN = 1
     _MAX = 9
 
+
+    TYPE_MAP = {
+        OFFLINE: _("Offline"),
+        ONLINE: _("Online"),
+        AVAILABLE: _("Available"),
+        AWAY: _("Away"),
+        IDLE: _("Idle"),
+        DISCONNECTED: _("Disconnected"),
+        CONNECTED: _("Connected"),
+        CHATERROR: _("Chat Error"),
+        PURPLE: _("Purple"),
+        }
+
+    STATUS_STRING_FMT = _("%s changed status to %s%s")
+
     def __init__(self,  **kwargs):
+        self._msg_text = ''
+        self._msg_html = ''
         atype = kwargs.get('type', None)
         if atype < self._MIN or atype > self._MAX:
             raise TypeError("unknown type '%s' for status" % atype)
@@ -253,8 +292,37 @@ class Status(Entry):
         super(Status, self).__init__(**kwargs)
 
     @property
+    def typestr(self):
+        return self.TYPE_MAP[self.type]
+
+    @property
+    def msg_text(self):
+        if not self._msg_text and self.msg_html:
+            self._msg_text = _get_text(self.msg_html)
+        return self._msg_text
+
+    @property
+    def msg_html(self):
+        return self._msg_html
+
+    @property
+    def html(self):
+        if not self._html:
+            self._html = []
+            s = self.STATUS_STRING_FMT % \
+                (self.alias if self.alias else self.sender, self.typestr,
+                 ': ' if self.msg_html else '')
+            self._html.append(NavigableString(s))
+            self._html.extend(self.msg_html)
+        return self._html
+
+    @property
     def type(self):
         return self._type
+
+    def __str__(self):
+        s = super(Status, self).__str__()
+        return '*%s* %s' % (self.typestr, s)
 
 class Event(Entry):
     """Immutable object representing an event in a Conversation"""
@@ -263,6 +331,11 @@ class Event(Entry):
 
     _MIN = 1
     _MAX = 2
+
+    TYPE_MAP = {
+        WINDOWCLOSED: _("Window Closed"),
+        WINDOWOPENED: _("Window Opened"),
+        }
 
     def __init__(self, **kwargs):
         atype = kwargs.get('type', None)
@@ -275,3 +348,11 @@ class Event(Entry):
     @property
     def type(self):
         return self._type
+
+    @property
+    def typestr(self):
+        return self.TYPE_MAP[self.type]
+
+    def __str__(self):
+        s = super(Event, self).__str__()
+        return '*%s* %s' % (self.typestr, s)

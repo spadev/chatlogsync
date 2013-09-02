@@ -16,6 +16,8 @@ from chatlogsync.errors import ParseError
 from chatlogsync.conversation import Conversation, Message, Status, Event
 from chatlogsync.timezones import getoffset
 
+import sys
+
 class Adium(ChatlogFormat):
     type = 'adium'
     SERVICE_MAP = {'GTalk' : 'gtalk',
@@ -33,6 +35,9 @@ class Adium(ChatlogFormat):
                       'available': Status.AVAILABLE,
                       'chat-error': Status.CHATERROR,
                       }
+
+    MSG_STATUSTYPES = (Status.OFFLINE, Status.ONLINE, Status.AVAILABLE,
+                       Status.AWAY, Status.IDLE)
 
     EVENT_TYPEMAP = {'windowClosed': Event.WINDOWCLOSED,
                      'windowOpened': Event.WINDOWOPENED,
@@ -64,7 +69,6 @@ class Adium(ChatlogFormat):
         if not info:
             return None
 
-        # time = parse(info['time'].replace('.', ':'), tzinfos=getoffset)
         time = self._parse_ftime(info['time'])
         source = info['source']
         destination = info['destination']
@@ -80,7 +84,6 @@ class Adium(ChatlogFormat):
         return [conversation]
 
     def parse_conversation(self, conversation):
-        # parse xml
         with codecs.open(conversation.path, encoding='utf-8') as f:
             soup = BeautifulSoup(f, ['lxml', 'xml'])
         chat = soup.find('chat')
@@ -92,16 +95,21 @@ class Adium(ChatlogFormat):
             attrs = {}
             for a in ('alias', 'sender', 'auto', 'time'):
                 attrs[a] = e.get(a, '')
+
+            # isuser
+            attrs['isuser'] = attrs['sender'] == conversation.source
+
             attrs['auto'] = True if attrs['auto'] else False
             if attrs['time']:
                 attrs['time'] = self._parse_ctime(attrs['time'])
-                # attrs['time'] = parse(attrs[2'time'], default=conversation.time,
-                #                       ignoretz=True)
             attrs['html'] =  list(e.children)
 
             if e.name == 'status':
                 cons = Status
                 attrs['type'] = self.STATUS_TYPEMAP.get(e.get('type'), None)
+                if attrs['type'] in self.MSG_STATUSTYPES:
+                    attrs['msg_html'] = attrs['html']
+                    del attrs['html']
             elif e.name == 'event':
                 cons = Event
                 attrs['type'] = self.EVENT_TYPEMAP.get(e.get('type'), None)
@@ -115,7 +123,7 @@ class Adium(ChatlogFormat):
                 attrs['system'] = True
             try:
                 conversation.entries.append(cons(**attrs))
-            except StandardError as err:
+            except Exception as err:
                 print_e("Problem with element %s" % e)
                 raise err
 
@@ -170,10 +178,17 @@ class Adium(ChatlogFormat):
             v = v1+v2[:3]+':'+v2[3:]
             elem['time'] = v
 
-            if not entry.html:
-                elem.append(entry.text)
+            if isinstance(entry, Status) and entry.type in self.MSG_STATUSTYPES:
+                htmlattr = 'msg_html'
+                textattr = 'msg_text'
             else:
-                for html in entry.html:
+                htmlattr = 'html'
+                textattr = 'text'
+
+            if not getattr(entry, htmlattr):
+                elem.append(getattr(entry, textattr))
+            else:
+                for html in getattr(entry, htmlattr):
                     elem.append(html)
 
             chat.append(elem)

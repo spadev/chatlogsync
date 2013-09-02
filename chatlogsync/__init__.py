@@ -1,7 +1,10 @@
 from __future__ import unicode_literals
 from __future__ import absolute_import
 
-import __builtin__
+try:
+    import __builtin__
+except ImportError:
+    import builtins as __builtin__
 from gettext import gettext as _
 
 from chatlogsync.dprint import print_d, print_e, print_, print_v, print_w

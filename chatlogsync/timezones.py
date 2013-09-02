@@ -11,39 +11,61 @@ import datetime as dt
 import dateutil.tz as dtz
 
 # timezones in same country have higher priority
-try:
-    country = re.sub('.*_', '', locale.getdefaultlocale()[0])
-except Exception:
-    country = ''
-country_timezones = []
-if not country:
-    print_w('Unable to determine country: '
-            'timezone abbreviations may not be what you want')
-country_timezones = pytz.country_timezones[country]
 
 tznames = collections.defaultdict(list)
 tzabbrevs = {}
 tzoffsets_i = {}
 tzoffsets_s = {}
-for name in pytz.common_timezones:
-    timezone=dtz.gettz(name)
-    now=dt.datetime.now(timezone)
+country_timezones = []
+locale_datetime_fmt = None
 
-    offset_s=now.strftime('%z')
-    o1 = int(offset_s[:-2])
-    o2 = int(offset_s[-2:])/0.6
-    offset_i = o1 + (o2 if o2 > 0 else -o2)
-    offset_i = int(offset_i*3600)
+def init():
+    global locale_datetime_fmt
 
-    abbrev=now.strftime('%Z')
+    # already initialized
+    if locale_datetime_fmt:
+        print_d('timezones already initialized')
+        return
 
-    tznames[offset_s].append((name, abbrev))
-    tznames[offset_i].append((name, abbrev))
-    tznames[abbrev].append((name, abbrev))
+    # use system locale for %c in strftime
+    locale.setlocale(locale.LC_ALL, '')
+    locale_datetime_fmt = locale.nl_langinfo(locale.D_T_FMT)
 
-    tzabbrevs[name] = abbrev
-    tzoffsets_i[name] = offset_i
-    tzoffsets_s[name] = offset_s
+    try:
+        country = re.sub('.*_', '', locale.getdefaultlocale()[0])
+    except Exception:
+        country = ''
+    if not country:
+        print_w('Unable to determine country: '
+                'timezone abbreviations may not be what you want')
+    country_timezones = pytz.country_timezones[country]
+
+    for name in pytz.common_timezones:
+        timezone = dtz.gettz(name)
+        now = dt.datetime.now(timezone)
+
+        offset_s = now.strftime('%z')
+        if not offset_s:
+            print_d('no timezone offset for', name)
+            continue
+
+        o1 = int(offset_s[:-2])
+        o2 = int(offset_s[-2:])/0.6
+        offset_i = o1 + (o2 if o2 > 0 else -o2)
+        offset_i = int(offset_i*3600)
+
+        abbrev=now.strftime('%Z')
+
+        tznames[offset_s].append((name, abbrev))
+        tznames[offset_i].append((name, abbrev))
+        tznames[abbrev].append((name, abbrev))
+
+        tzabbrevs[name] = abbrev
+        tzoffsets_i[name] = offset_i
+        tzoffsets_s[name] = offset_s
+
+    for k in iter(tznames.keys()):
+        tznames[k].sort(key=_sort_func)
 
 def _sort_func(entry):
     name, abbrev = entry
@@ -52,9 +74,6 @@ def _sort_func(entry):
     if name in country_timezones:
         return -1
     return 0
-
-for k in iter(tznames.keys()):
-    tznames[k].sort(key=_sort_func)
 
 def getoffset(abbrev, offset):
     """Return a dateutil.tz.tzoffset object"""

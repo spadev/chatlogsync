@@ -11,7 +11,7 @@ from argparse import ArgumentParser, ArgumentTypeError
 from multiprocessing import Process, cpu_count, Value, Manager, Lock
 
 import chatlogsync
-from chatlogsync import const, formats, util
+from chatlogsync import const, formats, util, timezones
 
 WORKERS = []
 
@@ -29,7 +29,7 @@ class Progress(object):
         print_v(msg)
         print_('\r[read:%i wrote:%i existing:%i error:%i]%s ' %
                (self.nread, self.nwrote, self.nexisting, self.nerror, dryrun),
-               end='', flush=True)
+               end='', flush=True, file=sys.stderr)
         print_v('\n')
 
     def _incr(self, var, n=1):
@@ -247,7 +247,7 @@ def convert(paths, options):
 
     WORKERS = [Parser(options.format, options.force, options.destination,
                       queue, files, progress, fslock)
-               for i in xrange(options.threads)]
+               for i in range(options.threads)]
 
     for w in WORKERS:
         w.start()
@@ -264,32 +264,36 @@ def convert(paths, options):
     return 0
 
 def main(options):
-    print_('gathering paths...', end='', flush=True)
+    print_('gathering paths...', end='', flush=True, file=sys.stderr)
     src_paths = util.get_paths(options.source)
-    print_('done')
+    print_('done', file=sys.stderr)
 
     convert(src_paths, options)
 
     return 0
 
 def cleanup(exitcode):
+    progress = None
     for w in WORKERS:
         progress = w.progress
         w.stop()
     for w in WORKERS:
         w.join()
 
-    progress.print_status('done')
+    if progress:
+        progress.print_status('done')
+        exitcode += progress.nerror
     if not const.VERBOSE:
         print_('')
 
-    return progress.nerror + exitcode
+    return exitcode
 
 if __name__ == "__main__":
     options = None
     try:
         exitcode = 0
         options = parse_args()
+        timezones.init()
         exitcode = main(options)
     except KeyboardInterrupt:
         exitcode = 1

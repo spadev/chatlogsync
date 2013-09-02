@@ -2,31 +2,35 @@ from __future__ import print_function
 from __future__ import unicode_literals
 from __future__ import absolute_import
 
-import sys
+from sys import stdout, stderr
+
 from chatlogsync import const
 from multiprocessing import RLock
 
 _printlock = RLock()
-def _print(msg, file, end, flush=False):
+def _print(*args, **kwargs):
+    flush = kwargs.pop('flush', False)
     with _printlock:
-        print(msg, file=file, end=end)
+        print(*args, **kwargs)
         if flush:
-            file.flush()
+            kwargs.get('file', stdout).flush()
 
-def print_e(msg, file=sys.stderr, end='\n'):
-    _print('E: %s' % msg, file, end)
+def print_e(*args, **kwargs):
+    kwargs['file'] = stderr
+    _print('E:', *args, **kwargs)
 
-def print_w(msg, file=sys.stderr, end='\n'):
+def print_w(*args, **kwargs):
     if not const.QUIET:
-        _print('W: %s' % msg, file, end)
+        kwargs['file'] = stderr
+        _print('W:', *args, **kwargs)
 
-def print_(msg, file=sys.stdout, end='\n', flush=False):
-    _print(msg, file, end, flush)
+def print_(*args, **kwargs):
+    _print(*args, **kwargs)
 
-def print_d(msg, file=sys.stdout, end='\n'):
+def print_d(*args, **kwargs):
     if const.DEBUG:
-        _print(msg, file, end)
+        _print(*args, **kwargs)
 
-def print_v(msg, file=sys.stdout, end='\n'):
+def print_v(*args, **kwargs):
     if const.VERBOSE:
-        _print(msg, file, end)
+        _print(*args, **kwargs)
