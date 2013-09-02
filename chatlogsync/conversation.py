@@ -261,10 +261,11 @@ class Status(Entry):
     DISCONNECTED = 6
     CONNECTED = 7
     CHATERROR = 8
-    PURPLE = 9
+    SYSTEM = 9
+    MOBILE = 10
 
     _MIN = 1
-    _MAX = 9
+    _MAX = 10
 
 
     TYPE_MAP = {
@@ -276,7 +277,8 @@ class Status(Entry):
         DISCONNECTED: _("Disconnected"),
         CONNECTED: _("Connected"),
         CHATERROR: _("Chat Error"),
-        PURPLE: _("Purple"),
+        SYSTEM: _("System Message"),
+        MOBILE: _("Mobile"),
         }
 
     STATUS_STRING_FMT = _("%s changed status to %s%s")
@@ -309,11 +311,15 @@ class Status(Entry):
     def html(self):
         if not self._html:
             self._html = []
-            s = self.STATUS_STRING_FMT % \
-                (self.alias if self.alias else self.sender, self.typestr,
-                 ': ' if self.msg_html else '')
-            self._html.append(NavigableString(s))
-            self._html.extend(self.msg_html)
+            if self.type in (self.CHATERROR, self.SYSTEM, self.DISCONNECTED,
+                             self.CONNECTED):
+                self._html.append(self.typestr)
+            else:
+                s = self.STATUS_STRING_FMT % \
+                    (self.alias if self.alias else self.sender, self.typestr,
+                     ': ' if self.msg_html else '')
+                self._html.append(NavigableString(s))
+                self._html.extend(self.msg_html)
         return self._html
 
     @property

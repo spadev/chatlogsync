@@ -11,13 +11,12 @@ from os.path import join, dirname, relpath, realpath
 
 from dateutil.parser import parse
 from bs4 import BeautifulSoup
-from bs4.element import Tag, NavigableString
+from bs4.element import Tag, NavigableString, Comment
 
+from chatlogsync import util, const, timezones
 from chatlogsync.formats._base import ChatlogFormat
-from chatlogsync import util
 from chatlogsync.errors import ParseError, ArgumentError
 from chatlogsync.conversation import Conversation, Message, Status, Event
-from chatlogsync import timezones
 from chatlogsync.timezones import getoffset
 
 class PidginHtml(ChatlogFormat):
@@ -47,11 +46,8 @@ class PidginHtml(ChatlogFormat):
                       _("<alias> is no longer <type>."): Status.AVAILABLE,
                       _("<alias> has signed off."): Status.OFFLINE,
                       _("<alias> has signed on."): Status.ONLINE,
-                      # _("<sender> is now known as <alias>"): Status.PURPLE,
-                      # _("<alias> has left the conversation"):
-                          #     Status.PURPLE,
                       _("<alias> has become idle."): Status.IDLE,
-                      # _("<alias> is mobile."): Status.MOBILE,
+                      _("<alias> is mobile."): Status.MOBILE,
                       }
 
     SOURCE_REGEX = re.compile('/[^/]*$')
@@ -170,10 +166,13 @@ class PidginHtml(ChatlogFormat):
     def _parse_info(self, info, conversation=None):
         info['service'] = self.SERVICE_MAP[info['service']]
         info['source'] = self.SOURCE_REGEX.sub('', info['source'])
-        if info['service'] == 'jabber' and \
-                (info['destination'].endswith('@gmail.com') or
-                 info['source'].endswith('@gmail.com')):
+        if info['service'] == 'jabber':
+            if info['destination'].endswith('@gmail.com') or \
+                    info['source'].endswith('@gmail.com'):
                 info['service'] = 'gtalk'
+            if info['destination'].endswith('@chat.facebook.com') or \
+                    info['source'].endswith('@chat.facebook.com'):
+                info['service'] = 'facebook'
 
         info['time'] = parse(info['time'], tzinfos=getoffset)
         if not info['time'].tzname():
@@ -191,7 +190,7 @@ class PidginHtml(ChatlogFormat):
             print_d("Skipping line %s" % line)
             return None, None
 
-        fonttag = soup.find('font')
+        fonttag = soup.font
         attrs['color'] = fonttag.get('color')
         if attrs['color'] == self.DELAYED_COLOR:
             attrs['delayed'] = True
@@ -201,13 +200,13 @@ class PidginHtml(ChatlogFormat):
             timestr = fonttag.text
         elif attrs['color'] == self.ERROR_COLOR:
             cons = Status
-            timestr = fonttag.find('font').text
+            timestr = fonttag.font.text
             attrs['type'] = Status.CHATERROR
         elif attrs['color']:
             cons = Message
-            timestr = fonttag.find('font').text
+            timestr = fonttag.font.text
             attrs['sender'] = senders_by_color.get(attrs['color'])
-            attrs['alias'] = fonttag.find('b').text[:-1] # trailing ':'
+            attrs['alias'] = fonttag.b.text[:-1] # trailing ':'
             m = self.AUTOREPLY_REGEX.match(attrs['alias'])
             if m:
                 attrs['alias'] = m.group('alias')
@@ -228,10 +227,10 @@ class PidginHtml(ChatlogFormat):
 
         # message
         if attrs['color'] and attrs['color'] != self.ERROR_COLOR:
-            html = [e for e in fonttag.nextSiblingGenerator()]
+            html = [e for e in fonttag.next_siblings]
         # status: html in <b> tag
         else:
-            html = list(soup.find('b').children)
+            html = list(soup.b.children)
 
         if html and isinstance(html[0], NavigableString):
             s = html[0].lstrip()
@@ -245,9 +244,9 @@ class PidginHtml(ChatlogFormat):
             self._parse_status(attrs, conversation,
                                attrs['color'] == self.ERROR_COLOR)
             if not attrs['type']:
-                print_d("No type found for status '%s': using purple"
+                print_d("No type found for status '%s': using system"
                         % line)
-                attrs['type'] = Status.PURPLE
+                attrs['type'] = Status.SYSTEM
 
         return (cons, attrs)
 
@@ -295,6 +294,7 @@ class PidginHtml(ChatlogFormat):
         titlestr = self.fill_pattern(conversation, self.TITLE_PATTERN,
                                      self.TIME_FMT_TITLE)
 
+        soup.append(Comment(const.HEADER_COMMENT))
         soup.append(html)
 
         html.append(head)
@@ -309,17 +309,17 @@ class PidginHtml(ChatlogFormat):
         h3.append(titlestr)
         title.append(titlestr)
 
-        prev_date = conversation.entries[0].time.date() \
-            if conversation.entries else None
+        # prev_date = conversation.entries[0].time.date() \
+        #     if conversation.entries else None
 
         for entry in conversation.entries:
-            cur_date = entry.time.date()
-            if cur_date > prev_date:
-                timefmt = self.TIME_FMT_CONVERSATION_WITH_DATE
-            else:
-                timefmt = self.TIME_FMT_CONVERSATION
-            prev_date = cur_date
-
+            # cur_date = entry.time.date()
+            # if cur_date > prev_date:
+            #     timefmt = self.TIME_FMT_CONVERSATION_WITH_DATE
+            # else:
+            #     timefmt = self.TIME_FMT_CONVERSATION
+            # prev_date = cur_date
+            timefmt = self.TIME_FMT_CONVERSATION
             if self._append_html(entry, body, conversation, soup, timefmt):
                 body.append(soup.new_tag(name='br'))
                 body.append('\n')

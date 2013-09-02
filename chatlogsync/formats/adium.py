@@ -8,10 +8,10 @@ import datetime
 from os.path import join, dirname, relpath, realpath
 
 from bs4 import BeautifulSoup
-from bs4.element import Tag
+from bs4.element import Tag, Comment
 
+from chatlogsync import util, const
 from chatlogsync.formats._base import ChatlogFormat
-from chatlogsync import util
 from chatlogsync.errors import ParseError
 from chatlogsync.conversation import Conversation, Message, Status, Event
 from chatlogsync.timezones import getoffset
@@ -31,7 +31,7 @@ class Adium(ChatlogFormat):
                       'connected': Status.CONNECTED,
                       'away': Status.AWAY,
                       'idle': Status.IDLE,
-                      'purple': Status.PURPLE,
+                      'purple': Status.SYSTEM,
                       'available': Status.AVAILABLE,
                       'chat-error': Status.CHATERROR,
                       }
@@ -86,7 +86,7 @@ class Adium(ChatlogFormat):
     def parse_conversation(self, conversation):
         with codecs.open(conversation.path, encoding='utf-8') as f:
             soup = BeautifulSoup(f, ['lxml', 'xml'])
-        chat = soup.find('chat')
+        chat = soup.chat
 
         for e in chat.children:
             if not isinstance(e, Tag):
@@ -145,6 +145,7 @@ class Adium(ChatlogFormat):
         conversation = conversations[0]
         soup = BeautifulSoup(features='xml')
         chat = soup.new_tag(name='chat')
+        soup.append(Comment(const.HEADER_COMMENT))
         soup.append(chat)
 
         chat['xmlns'] = self.XMLNS
