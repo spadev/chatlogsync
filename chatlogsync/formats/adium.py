@@ -33,7 +33,7 @@ class Adium(ChatlogFormat):
                       'idle': Status.IDLE,
                       'purple': Status.SYSTEM,
                       'available': Status.AVAILABLE,
-                      'chat-error': Status.CHATERROR,
+                      'chat-error': Status.ERROR,
                       }
 
     MSG_STATUSTYPES = (Status.OFFLINE, Status.ONLINE, Status.AVAILABLE,
@@ -87,8 +87,13 @@ class Adium(ChatlogFormat):
         with codecs.open(conversation.path, encoding='utf-8') as f:
             soup = BeautifulSoup(f, ['lxml', 'xml'])
         chat = soup.chat
+        header_comment = chat.previous
+        if isinstance(header_comment, Comment):
+            conversation.original_parser_name = header_comment.split('/')[1]
+        else:
+            conversation.original_parser_name = self.type
 
-        for e in chat.children:
+        for e in soup.chat.children:
             if not isinstance(e, Tag):
                 continue
 
@@ -145,7 +150,8 @@ class Adium(ChatlogFormat):
         conversation = conversations[0]
         soup = BeautifulSoup(features='xml')
         chat = soup.new_tag(name='chat')
-        soup.append(Comment(const.HEADER_COMMENT))
+        soup.append(Comment(const.HEADER_COMMENT %
+                            conversation.original_parser_name))
         soup.append(chat)
 
         chat['xmlns'] = self.XMLNS

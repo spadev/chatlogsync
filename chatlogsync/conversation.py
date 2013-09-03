@@ -59,6 +59,7 @@ class Conversation(object):
         self._service = service
         self._path = path
         self._parsedby = parsedby
+        self._original_parser_name = None
 
         for argname in ('source', 'destination', 'service', 'path'):
             _validate_argument(getattr(self, '_'+argname), argname, basestring)
@@ -68,6 +69,14 @@ class Conversation(object):
         self.__validate_time(time)
         self.__validate_images(images)
         self.entries = entries
+
+
+    @property
+    def original_parser_name(self):
+        return self._original_parser_name
+    @original_parser_name.setter
+    def original_parser_name(self, name):
+        self._original_parser_name = name
 
     @property
     def source(self):
@@ -185,7 +194,10 @@ class Entry(object):
         for argname in ('alias', 'sender', 'text'):
             _validate_argument(getattr(self, '_'+argname), argname, basestring)
 
-        if not self._alias and not self._sender and not self._system:
+        if self._system:
+            self._alias = ''
+            self._sender = ''
+        elif not self._alias and not self._sender:
             raise ArgumentError('non-system Entry must have sender or alias')
         elif self._alias == self._sender:
             self._alias = ''
@@ -264,13 +276,12 @@ class Status(Entry):
     IDLE = 5
     DISCONNECTED = 6
     CONNECTED = 7
-    CHATERROR = 8
+    ERROR = 8
     SYSTEM = 9
     MOBILE = 10
 
     _MIN = 1
     _MAX = 10
-
 
     TYPE_MAP = {
         OFFLINE: _("Offline"),
@@ -280,19 +291,21 @@ class Status(Entry):
         IDLE: _("Idle"),
         DISCONNECTED: _("Disconnected"),
         CONNECTED: _("Connected"),
-        CHATERROR: _("Chat Error"),
+        ERROR: _("Error"),
         SYSTEM: _("System Message"),
         MOBILE: _("Mobile"),
         }
 
-    STATUS_STRING_FMT = _("%s changed status to %s%s")
+    USER_TYPES = (OFFLINE, ONLINE, AVAILABLE, AWAY, IDLE, MOBILE)
+    CHANGED_STATUS_TO = _("changed status to")
+    STATUS_STRING_FMT = "%s "+CHANGED_STATUS_TO+" %s%s"
 
     def __init__(self,  **kwargs):
         self._msg_text = ''
         self._msg_html = ''
         atype = kwargs.get('type', None)
         if atype < self._MIN or atype > self._MAX:
-            raise TypeError("unknown type '%s' for status" % atype)
+            raise TypeError("unknown type %r for status" % atype)
         self._type = atype
 
         super(Status, self).__init__(**kwargs)
@@ -315,15 +328,14 @@ class Status(Entry):
     def html(self):
         if not self._html:
             self._html = []
-            if self.type in (self.CHATERROR, self.SYSTEM, self.DISCONNECTED,
-                             self.CONNECTED):
-                self._html.append(self.typestr)
-            else:
+            if self.type in self.USER_TYPES:
                 s = self.STATUS_STRING_FMT % \
                     (self.alias if self.alias else self.sender, self.typestr,
                      ': ' if self.msg_html else '')
                 self._html.append(NavigableString(s))
                 self._html.extend(self.msg_html)
+            else:
+                self._html.append(self.typestr)
         return self._html
 
     @property

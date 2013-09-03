@@ -88,7 +88,8 @@ class PidginHtml(ChatlogFormat):
                 del lines[-1]
         title_line, first_line = lines[0].split('\n', 1)
         lines[0] = first_line
-        info = self._parse_title(title_line, conversation)
+        info, conversation.original_parser_name = \
+            self._parse_title(title_line, conversation)
 
         for k, v in iter(info.items()):
             cv = getattr(conversation, k)
@@ -201,7 +202,7 @@ class PidginHtml(ChatlogFormat):
         elif attrs['color'] == self.ERROR_COLOR:
             cons = Status
             timestr = fonttag.font.text
-            attrs['type'] = Status.CHATERROR
+            attrs['type'] = Status.ERROR
         elif attrs['color']:
             cons = Message
             timestr = fonttag.font.text
@@ -252,7 +253,7 @@ class PidginHtml(ChatlogFormat):
         attrs['html'] = html
 
         if cons == Status:
-            self._parse_status(attrs, conversation,
+            self._parse_status(soup, attrs, conversation,
                                attrs['color'] == self.ERROR_COLOR)
             if not attrs['type']:
                 print_d("No type found for status '%s': using system"
@@ -261,13 +262,26 @@ class PidginHtml(ChatlogFormat):
 
         return (cons, attrs)
 
-    def _parse_status(self, info, conversation, error=False):
+    def _parse_status(self, soup, info, conversation, error=False):
+        # already converted using another module
+        comment = soup.html.previous
+        if isinstance(comment, Comment):
+            info['type'], info['system'], info['sender'] = \
+                comment.split("|", 2)
+            info['type'] = int(info['type'])
+            if info['type'] in Status.USER_TYPES:
+                l = info['html'][0].split(': ', 1)
+                if len(l) > 1:
+                    info['msg_html'] = l[1]
+                del info['html']
+            return
+
         s = ''.join([x.text if isinstance(x, Tag) else x.string
                      for x in info['html']])
         info['sender'] = conversation.source \
             if s.startswith(_("You")) else None
         if error:
-            info['type'] = Status.CHATERROR
+            info['type'] = Status.ERROR
         else:
             for pattern, t in iter(self.STATUS_TYPEMAP.items()):
                 i = util.parse_string(s, pattern)
@@ -278,10 +292,16 @@ class PidginHtml(ChatlogFormat):
 
     def _parse_title(self, line, conversation):
         soup = BeautifulSoup(line)
-        info = util.parse_string(soup.text, self.TITLE_PATTERN)
+        info = util.parse_string(soup.title.text, self.TITLE_PATTERN)
         self._parse_info(info, conversation)
 
-        return info
+        header_comment = soup.html.previous
+        if isinstance(header_comment, Comment):
+            original_parser_name = header_comment.split('/')[1]
+        else:
+            original_parser_name = self.type
+
+        return info, original_parser_name
 
     def write(self, path, conversations):
         if len(conversations) != 1:
@@ -305,7 +325,8 @@ class PidginHtml(ChatlogFormat):
         titlestr = self.fill_pattern(conversation, self.TITLE_PATTERN,
                                      self.TIME_FMT_TITLE)
 
-        soup.append(Comment(const.HEADER_COMMENT))
+        soup.append(Comment(const.HEADER_COMMENT %
+                            conversation.original_parser_name))
         soup.append(html)
 
         html.append(head)
@@ -358,18 +379,25 @@ class PidginHtml(ChatlogFormat):
                 body.append(e)
         elif isinstance(entry, Status):
             # error:
-            # <font color="#FF0000"><font size="2">(_time)</font><b> _msg</b></font>
+            # <font color="#FF0000"><font size="2">(_t)</font><b> m</b></font>
             # normal:
-            # <font size="2">(_time)</font><b> _msg</b>
+            # <font size="2">(_t)</font><b> _m</b>
             msgtag = soup.new_tag(name='b')
             timetag = soup.new_tag(name='font', size=2)
 
             timetag.append(entry.time.strftime(timefmt))
 
+            # append comment indicating this Status was not parsed by us
+            if conversation.original_parser_name != self.type:
+                text = "%s|%s|%s" % (entry.type,
+                                     '1' if entry.system else '',
+                                     entry.sender)
+                body.append(Comment(text))
+
             msgtag.append(' ')
             for e in entry.html:
                 msgtag.append(e)
-            if entry.type == Status.CHATERROR:
+            if entry.type == Status.ERROR:
                 color = self.ERROR_COLOR
                 f = soup.new_tag(name='font', color=color)
                 f.append(timetag)

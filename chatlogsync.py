@@ -77,7 +77,8 @@ class Parser(Process):
         self.force = force
         self._files = files
         self._fslock = fslock
-        self._modules =  [x() for x in formats.all_formats.values()]
+        self._modules = [x() for x in formats.all_formats.values()]
+        self._modules_map = {x.type: x for x in self._modules}
         self._stopped = Value('i', 0)
         self._curpath = ''
 
@@ -194,7 +195,7 @@ def parse_args():
                         default=False,
                         )
     parser.add_argument("-f", "--format",
-                        choices=formats.output_formats,
+                        choices=[str(x) for x in formats.output_formats],
                         help=_("format to use for output files"),
                         default=None,
                         )
