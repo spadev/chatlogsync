@@ -55,13 +55,14 @@ def _get_text(html):
 class Conversation(object):
     """Object representing a conversation from a chatlog"""
     def __init__(self, parsedby, path, source, destination,
-                 service, time, entries, images):
+                 service, time, entries, images, isgroup=False):
         self._source = source
         self._destination = destination
         self._service = service
         self._path = path
         self._parsedby = parsedby
         self._original_parser_name = None
+        self._isgroup = True if isgroup else False
 
         for argname in ('source', 'destination', 'service', 'path'):
             _validate_argument(getattr(self, '_'+argname), argname, basestring)
@@ -79,6 +80,13 @@ class Conversation(object):
     @original_parser_name.setter
     def original_parser_name(self, name):
         self._original_parser_name = name
+
+    @property
+    def isgroup(self):
+        return self._isgroup
+    @isgroup.setter
+    def isgroup(self, isgroup):
+        self._isgroup = isgroup
 
     @property
     def source(self):

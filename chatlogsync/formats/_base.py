@@ -39,12 +39,16 @@ class ChatlogFormat(object):
 
         s = re.split('<(.*?)>', pattern)
         for i in range(1, len(s), 2):
-            a = getattr(conversation, s[i])
-            if s[i] == 'service':
-                a = self.PAM_ECIVRES[a]
-            elif isinstance(a, datetime.datetime):
-                a = a.strftime(time_fmt)
-            s[i] = a
+            item = s[i].split(' ', 1)
+            attr = item[0]
+            value = getattr(conversation, attr)
+            if len(item) == 2:
+                value = item[1] if value else ''
+            if attr == 'service':
+                value = self.PAM_ECIVRES[value]
+            elif isinstance(value, datetime.datetime):
+                value = value.strftime(time_fmt)
+            s[i] = value
 
         return ''.join(s)
 

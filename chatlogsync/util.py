@@ -10,15 +10,20 @@ from chatlogsync.errors import ParseError
 
 def parse_string(string, pattern):
     s = re.split('<(.*?)>', pattern)
-    keys = {}
+    counts = {}
     for i in range(0, len(s), 2):
         s[i] = re.escape(s[i])
     for i in range(1, len(s), 2):
-        key = s[i]
-        if key not in keys:
-            keys[key] = 0
-        keys[key] += 1
-        s[i] = "(?P<%s%i>.*?)" % (s[i], keys[key])
+        item = s[i].split(' ', 1)
+        key = item[0]
+        fmt = "(?P<%s%i>.*?)" if len(item) == 1 else \
+            "(?P<%s%i>{})?".format(item[1])
+
+        if key not in counts:
+            counts[key] = 0
+        counts[key] += 1
+
+        s[i] = fmt % (key, counts[key])
     regex_pattern = ''.join(s)
     s = re.search(regex_pattern, string)
     if not s:
