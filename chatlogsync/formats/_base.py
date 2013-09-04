@@ -30,14 +30,14 @@ class ChatlogFormat(object):
         if not self.FILE_PATTERN:
             raise NotImplementedError
 
-        return self.fill_pattern(conversation, self.FILE_PATTERN,
+        return self.fill_pattern(conversation, self.FILE_PATTERN[1:],
                                  self.TIME_FMT_FILE)
 
     def fill_pattern(self, conversation, pattern, time_fmt):
         if (not self.SERVICE_MAP):
             raise NotImplementedError
 
-        s = re.split('<(.*?)>', pattern)
+        s = re.split('{(.*?)}', pattern)
         for i in range(1, len(s), 2):
             item = s[i].split(' ', 1)
             attr = item[0]

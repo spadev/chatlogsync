@@ -200,6 +200,8 @@ class Entry(object):
             setattr(self, '_'+k, v)
 
         self._system = True if kwargs.get('system', None) else False
+        if self._text and not self._html:
+            self._html = [NavigableString(self._text)]
 
         for argname in ('alias', 'sender', 'text'):
             _validate_argument(getattr(self, '_'+argname), argname, basestring)
@@ -356,8 +358,11 @@ class Status(Entry):
         if atype < self._MIN or atype > self._MAX:
             raise TypeError("unknown type %r for status" % atype)
         self._type = atype
+        if self._msg_text and not self._msg_html:
+            self._msg_html = [NavigableString(self._msg_text)]
 
         super(Status, self).__init__(**kwargs)
+        self._has_other_html = True if self._html else False
 
     @property
     def typestr(self):
@@ -372,6 +377,10 @@ class Status(Entry):
     @property
     def msg_html(self):
         return self._msg_html
+
+    @property
+    def has_other_html(self):
+        return self._has_other_html
 
     @property
     def html(self):

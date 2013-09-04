@@ -1,7 +1,8 @@
 from __future__ import unicode_literals
 from __future__ import absolute_import
 
-# TODO: handle attached files
+# TODO: handle attached images
+# TODO: write real sender as comment in groupchat
 
 import re
 import sys
@@ -29,35 +30,67 @@ class PidginHtml(ChatlogFormat):
                    'facebook': 'jabber',
                    'aim': 'aim',
                    }
-    FILE_PATTERN = 'logs/<service>/<source>/<destination><isgroup .chat>/<time>.html'
+    FILE_PATTERN = ('/logs/{service}/{source}/{destination}{isgroup .chat}/'
+                    '{time}.html')
     TIME_FMT_FILE = '%Y-%m-%d.%H%M%S%z%Z'
-    TITLE_PATTERN = _("Conversation with <destination> "
-                     "at <time> on <source> (<service>)")
+    TITLE_PATTERN = _("Conversation with {destination} "
+                      "at {time} on {source} ({service})")
 
     SOURCE_COLOR = "#16569E"
     DESTINATION_COLOR = "#A82F2F"
     ERROR_COLOR = "#FF0000"
     ALTERNATE_COLOR = "#062585"
 
+    AUTOREPLY_HTML = '&lt;AUTO-REPLY&gt;'
+
+    MESSAGE_LINE_FMT = ('<font color="%s"><font size="2">%s</font>'
+                        ' <b>%s%s:</b></font> ')
+    MESSAGE_LINE_END = '<br/>'
+    MESSAGE_LINE_RE = \
+        re.compile(MESSAGE_LINE_FMT % ('(?P<color>.*?)',
+                                       '\((?P<time>.*?)\)',
+                                       '(?P<name>.*?)',
+                                       '(?P<auto>%s)?' % AUTOREPLY_HTML)
+                   + '(?P<html>.*)' + MESSAGE_LINE_END, re.DOTALL)
+
+    STATUS_LINE_FMT = '<font size="2">%s</font><b> '
+    STATUS_LINE_END = '</b><br/>'
+    STATUS_LINE_RE = \
+        re.compile((STATUS_LINE_FMT % '\((?P<time>.*?)\)')
+                   + '(?P<html>.*)' + STATUS_LINE_END, re.DOTALL)
+
+    ERROR_LINE_FMT = ('<font color="'+ERROR_COLOR+'"><font size="2">%s</font>'
+                      '<b> ')
+    ERROR_LINE_END = '</b></font><br/>'
+    ERROR_LINE_RE = \
+        re.compile((ERROR_LINE_FMT % '\((?P<time>.*?)\)')
+                   + '(?P<html>.*)' + ERROR_LINE_END, re.DOTALL)
+
+    TITLE_LINE_FMT = ('<html><head><meta http-equiv="content-type" '
+                      'content="text/html; charset=UTF-8"><title>%s</title>'
+                      '</head><body><h3>%s</h3>')
+    TITLE_LINE_RE = \
+        re.compile((TITLE_LINE_FMT % ('.*?', '(?P<titlestr>.*?)')))
+
+    COMMENT_RE = re.compile('^%s(?P<commentstr>.*?)%s' % (Comment.PREFIX,
+                                                          Comment.SUFFIX))
+    SOURCE_RE = re.compile('/[^/]*$')
+    TIME_RE = re.compile('([+-]\d+)([^0-9- ]+)')
+
     TIME_FMT_CONVERSATION = "(%X)"
     TIME_FMT_CONVERSATION_WITH_DATE = "(%x %X)"
 
-    STATUS_TYPEMAP = {_("<alias> has gone away."): Status.AWAY,
-                      _("<alias> is no longer <type>."): Status.AVAILABLE,
-                      _("<alias> has signed off."): Status.OFFLINE,
-                      _("<alias> has signed on."): Status.ONLINE,
-                      _("<alias> has become idle."): Status.IDLE,
-                      _("<alias> is mobile."): Status.MOBILE,
+    STATUS_TYPEMAP = {_("{alias} has gone away."): Status.AWAY,
+                      _("{alias} is no longer {type}."): Status.AVAILABLE,
+                      _("{alias} has signed off."): Status.OFFLINE,
+                      _("{alias} has signed on."): Status.ONLINE,
+                      _("{alias} has become idle."): Status.IDLE,
+                      _("{alias} is mobile."): Status.MOBILE,
                       }
 
-    CHAT_STATUS_TYPEMAP = {_("<alias> entered the room."): Status.SYSTEM,
-                           _("<alias> left the room."): Status.SYSTEM,
+    CHAT_STATUS_TYPEMAP = {_("{alias} entered the room."): Status.SYSTEM,
+                           _("{alias} left the room."): Status.SYSTEM,
                            }
-
-    SOURCE_REGEX = re.compile('/[^/]*$')
-    AUTOREPLY_REGEX = re.compile('(?P<alias>.* )(?P<autoreply><AUTO-REPLY>)$')
-
-    TIME_REGEX = re.compile('([+-]\d+)([^0-9- ]+)')
 
     def __init__(self, *args):
         super(PidginHtml, self).__init__(*args)
@@ -69,7 +102,7 @@ class PidginHtml(ChatlogFormat):
             return None
 
         timestr = info['time'].replace('.', ' ')
-        info['time'] = self.TIME_REGEX.sub(r'\2 \1', timestr)
+        info['time'] = self.TIME_RE.sub(r'\2 \1', timestr)
         self._parse_info(info)
         if info['destination'] == '.system':
             print_d('Ignoring system log %s' % path)
@@ -82,17 +115,29 @@ class PidginHtml(ChatlogFormat):
 
         return [conversation]
 
+    def _get_line_data(self, line):
+        """Return (line, comment)"""
+        data = self.COMMENT_RE.split(line)
+        if len(data) == 3:
+            l = data[1]
+            comment = data[2]
+        else:
+            l = data[0]
+            comment = ''
+
+        return l, comment
+
     def parse_conversation(self, conversation):
         with codecs.open(conversation.path, encoding='utf-8') as f:
-            data = f.read()
+            data = f.read().strip()
             lines = data.split('\n')
             if not lines[-1]:
                 del lines[-1]
             if lines[-1].endswith('</html>'):
                 del lines[-1]
-        title_line = lines.pop(0)
+        title_line, comment = self._get_line_data((lines.pop(0)))
         info, conversation.original_parser_name = \
-            self._parse_title(title_line, conversation)
+            self._parse_title(title_line, comment, conversation)
 
         for k, v in iter(info.items()):
             cv = getattr(conversation, k)
@@ -105,17 +150,16 @@ class PidginHtml(ChatlogFormat):
         ignore_aliases = set()
         attrs_list = []
         i = 0
+
         while i < len(lines):
             line = lines[i]
             while True:
-                if line.endswith('<br/>'):
-                    line = line[:-5]
-                    break
-                elif line.startswith('<!--'):
+                if line.endswith('<br/>') or line.startswith('<!--'):
                     break
                 line += '\n'+lines[i+1]
                 i += 1
             i += 1
+
             try:
                 cons, attrs = self._parse_line(line, conversation, prev_time)
             except ArgumentError as e:
@@ -160,13 +204,15 @@ class PidginHtml(ChatlogFormat):
                 attrs['alias'] = aliases_by_sender.get(attrs['sender'], '')
             if attrs['sender'] == attrs['alias']:
                 attrs['alias'] = ''
-            attrs['isuser'] = attrs['sender'] == conversation.source
+            if 'isuser' not in attrs:
+                attrs['isuser'] = attrs['sender'] == conversation.source
             entries.append(cons(**attrs))
+
         return entries
 
     def _parse_info(self, info, conversation=None):
         info['service'] = self.SERVICE_MAP[info['service']]
-        info['source'] = self.SOURCE_REGEX.sub('', info['source'])
+        info['source'] = self.SOURCE_RE.sub('', info['source'])
         if info['service'] == 'jabber':
             if info['destination'].endswith('@gmail.com') or \
                     info['source'].endswith('@gmail.com'):
@@ -186,51 +232,60 @@ class PidginHtml(ChatlogFormat):
         """Return (cons, attrs)"""
         attrs = dict(alias=None, time=None, sender=conversation.source,
                      type=None, html=None)
-        soup = BeautifulSoup(line, 'lxml')
-        if len(soup) == 0:
+        line, comment = self._get_line_data(line)
+        if not line and not comment:
             print_d("Skipping line %s" % line)
             return None, None
 
-        fonttag = soup.font
-
         # unrepresentable entry dump
-        if not fonttag:
-            cons, attrs = Entry.from_dump(soup.text)
+        if not line:
+            cons, attrs = Entry.from_dump(comment)
             return cons, attrs
 
-        color = fonttag.get('color')
-        if color == self.ALTERNATE_COLOR:
-            attrs['alternate'] = True
-
-        if fonttag.has_attr('size'):
-            cons = Status
-            timestr = fonttag.text
-        elif color == self.ERROR_COLOR:
-            cons = Status
-            timestr = fonttag.font.text
-            attrs['type'] = Status.ERROR
-        elif color:
-            cons = Message
-            timestr = fonttag.font.text
-            attrs['alias'] = fonttag.b.text[:-1] # trailing ':'
-            m = self.AUTOREPLY_REGEX.match(attrs['alias'])
+        matched = False
+        for regex in (self.MESSAGE_LINE_RE, self.STATUS_LINE_RE,
+                      self.ERROR_LINE_RE):
+            m = regex.match(line)
             if m:
-                attrs['alias'] = m.group('alias')
-                attrs['auto'] = True
+                matched = True
+                break
+
+        if not matched:
+            raise ParseError("could not parse line '%s'" % line)
+        # Message
+        elif regex == self.MESSAGE_LINE_RE:
+            color = m.group('color')
+            attrs['alternate'] = color == self.ALTERNATE_COLOR
+            timestr = m.group('time')
+            attrs['alias'] = m.group('name')
+            attrs['auto'] = m.group('auto')
+            htmlstr = m.group('html')
 
             if color == self.SOURCE_COLOR:
                 attrs['sender'] = conversation.source
+                attrs['isuser'] = True
             elif conversation.isgroup: # groupchats don't use aliases
                 attrs['sender'] = attrs['alias']
             elif color == self.DESTINATION_COLOR:
                 attrs['sender'] = conversation.destination
-        else:
-            raise ParseError("unexpected <font> found at line '%s'" % line)
+                attrs['isuser'] = False
 
-        # normal -> (10:10:10)
-        # delayed -> (2010-12-12 10:10:10)
-        timestr = timestr[1:-1]
+            cons = Message
+        # Status
+        elif regex == self.STATUS_LINE_RE:
+            timestr = m.group('time')
+            htmlstr = m.group('html')
+            cons = Status
+        # Error
+        elif regex == self.ERROR_LINE_RE:
+            timestr = m.group('time')
+            htmlstr = m.group('html')
+            attrs['color'] = self.ERROR_COLOR
+            cons = Status
+            attrs['type'] = Status.ERROR
+
         parsed = parse(timestr, default=datetime.datetime.min, ignoretz=True)
+        # delayed has full date in timestamp
         if parsed.date() == datetime.date.min:
             attrs['delayed'] = False
             attrs['time'] = parsed.replace(day=base_time.day,
@@ -241,35 +296,21 @@ class PidginHtml(ChatlogFormat):
             attrs['delayed'] = True
             attrs['time'] = parsed.replace(tzinfo=base_time.tzinfo)
 
-        # message
-        if cons == Message:
-            html = [e for e in fonttag.next_siblings]
-        # status: html in <b> tag
-        else:
-            html = list(soup.b.children)
 
-        # strip possible extra space in html
-        if html and isinstance(html[0], NavigableString):
-            s = html[0].lstrip()
-            if not s:
-                del html[0]
-            else:
-                html[0] = NavigableString(s)
-        attrs['html'] = html
+        attrs['html'] = \
+            list(BeautifulSoup('<foo>%s</foo>' % htmlstr).foo.children)
 
+        # parse status
         if cons == Status:
-            self._parse_status(soup, attrs, conversation,
-                               color == self.ERROR_COLOR)
+            self._parse_status(comment, attrs, conversation)
             if not attrs['type']:
                 print_d("No type found for status '%s': using SYSTEM" % line)
                 attrs['type'] = Status.SYSTEM
 
         return (cons, attrs)
 
-    def _parse_status(self, soup, info, conversation, error=False):
-        # already converted using another module
-        comment = soup.html.previous
-        if isinstance(comment, Comment):
+    def _parse_status(self, comment, info, conversation):
+        if comment:
             info['type'], info['system'], info['sender'] = \
                 comment.split("|", 2)
             info['type'] = int(info['type'])
@@ -284,9 +325,8 @@ class PidginHtml(ChatlogFormat):
                      for x in info['html']])
         info['sender'] = conversation.source \
             if s.startswith(_("You")) else None
-        if error:
-            info['type'] = Status.ERROR
-        else:
+
+        if not info['type']:
             typemap = dict(self.STATUS_TYPEMAP, **self.CHAT_STATUS_TYPEMAP) if \
                 conversation.isgroup else self.STATUS_TYPEMAP
             for pattern, t in iter(typemap.items()):
@@ -296,16 +336,11 @@ class PidginHtml(ChatlogFormat):
                         info[k] = v
                     info['type'] = t
 
-    def _parse_title(self, line, conversation):
-        soup = BeautifulSoup(line)
-        info = util.parse_string(soup.title.text, self.TITLE_PATTERN)
+    def _parse_title(self, line, comment, conversation):
+        m = self.TITLE_LINE_RE.match(line)
+        info = util.parse_string(m.group('titlestr'), self.TITLE_PATTERN)
         self._parse_info(info, conversation)
-
-        header_comment = soup.html.previous
-        if isinstance(header_comment, Comment):
-            original_parser_name = header_comment.split('/')[1]
-        else:
-            original_parser_name = self.type
+        original_parser_name = comment.split('/')[1] if comment else self.type
 
         return info, original_parser_name
 
@@ -318,50 +353,26 @@ class PidginHtml(ChatlogFormat):
                 )
 
         conversation = conversations[0]
-        soup = BeautifulSoup(features='html')
-        html = soup.new_tag(name='html')
-        head = soup.new_tag(name='head')
-        body = soup.new_tag(name='body')
-        attrs = {'http-equiv': 'content-type',
-                 'content': 'text/html; charset=UTF-8'}
-        meta = soup.new_tag(name='meta', **attrs)
-        h3 = soup.new_tag(name='h3')
-        title = soup.new_tag(name='title')
-
         titlestr = self.fill_pattern(conversation, self.TITLE_PATTERN,
                                      self.TIME_FMT_TITLE)
-
-        soup.append(Comment(const.HEADER_COMMENT %
-                            conversation.original_parser_name))
-        soup.append(html)
-
-        html.append(head)
-        html.append(body)
-
-        head.append(meta)
-        head.append(title)
-
-        body.append(h3)
-        body.append('\n')
-
-        h3.append(titlestr)
-        title.append(titlestr)
+        titlestr = NavigableString(titlestr).output_ready()
+        fh = codecs.open(path, 'wb', 'utf-8')
+        fh.write(Comment(const.HEADER_COMMENT %
+                         conversation.original_parser_name).output_ready())
+        fh.write(self.TITLE_LINE_FMT % (titlestr, titlestr) + '\n')
 
         for entry in conversation.entries:
             timefmt = self.TIME_FMT_CONVERSATION_WITH_DATE if entry.delayed \
                 else self.TIME_FMT_CONVERSATION
-            html = self._get_html(entry, conversation, soup, timefmt)
-            for h in html:
-                body.append(h)
-            body.append('\n')
+            self._write_entry(fh, entry, conversation, timefmt)
+            fh.write('\n')
 
         # newline at end
-        soup.append('\n')
-        with codecs.open(path, 'wb', 'utf-8') as fh:
-            fh.write(soup.decode())
+        fh.write('</body></html>\n')
+        fh.close()
 
-    def _get_html(self, entry, conversation, soup, timefmt):
-        html = []
+    def _write_entry(self, fh, entry, conversation, timefmt):
+        timestr = entry.time.strftime(timefmt)
         if isinstance(entry, Message):
             if entry.alternate:
                 color = self.ALTERNATE_COLOR
@@ -369,55 +380,39 @@ class PidginHtml(ChatlogFormat):
                 color = self.SOURCE_COLOR
             else:
                 color = self.DESTINATION_COLOR
-            f = soup.new_tag(name='font', color=color)
-            timetag = soup.new_tag(name='font', size=2)
-            timetag.append(entry.time.strftime(timefmt))
-            nametag = soup.new_tag(name='b')
-            nametag.append('%s%s:' % (entry.alias if entry.alias
-                                      else entry.sender,
-                                      '&lt;AUTO-REPLY&gt;' if entry.auto
-                                      else ''))
-            f.append(timetag)
-            f.append(' ')
-            f.append(nametag)
+            name = entry.alias if entry.alias else entry.sender
+            autoreply = self.AUTOREPLY_HTML if entry.auto else ''
+            timestr = entry.time.strftime(timefmt)
 
-            html.append(f)
-            html.append(' ')
-            for e in entry.html:
-                html.append(e)
-            html.append(soup.new_tag(name='br'))
+            fh.write(self.MESSAGE_LINE_FMT % (color, timestr, name, autoreply))
+            self._write_entry_html(fh, entry)
+            fh.write(self.MESSAGE_LINE_END)
         elif isinstance(entry, Status):
-            # error:
-            # <font color="#FF0000"><font size="2">(_t)</font><b> m</b></font>
-            # normal:
-            # <font size="2">(_t)</font><b> _m</b>
-            msgtag = soup.new_tag(name='b')
-            timetag = soup.new_tag(name='font', size=2)
-
-            timetag.append(entry.time.strftime(timefmt))
-
             # append comment indicating this Status was not parsed by us
             if conversation.original_parser_name != self.type:
                 text = "%s|%s|%s" % (entry.type,
                                      '1' if entry.system else '',
                                      entry.sender)
-                html.append(Comment(text))
+                fh.write(Comment(text).output_ready())
 
-            msgtag.append(' ')
-            for e in entry.html:
-                msgtag.append(e)
             if entry.type == Status.ERROR:
-                f = soup.new_tag(name='font', color=self.ERROR_COLOR)
-                f.append(timetag)
-                f.append(msgtag)
-                html.append(f)
+                fmt = self.ERROR_LINE_FMT
+                end = self.ERROR_LINE_END
             else:
-                html.append(timetag)
-                html.append(msgtag)
-            html.append(soup.new_tag(name='br'))
-        else:
-            html.append(Comment(entry.dump()))
+                fmt = self.STATUS_LINE_FMT
+                end = self.STATUS_LINE_END
 
-        return html
+            fh.write(fmt % timestr)
+            self._write_entry_html(fh, entry)
+            fh.write(end)
+        else:
+            fh.write(Comment(entry.dump()).output_ready())
+
+    def _write_entry_html(self, fh, entry):
+        for e in entry.html:
+            if isinstance(e, Tag):
+                fh.write(e.decode())
+            else:
+                fh.write(e.output_ready())
 
 formats = [PidginHtml]

@@ -9,7 +9,7 @@ from os.path import join, isfile
 from chatlogsync.errors import ParseError
 
 def parse_string(string, pattern):
-    s = re.split('<(.*?)>', pattern)
+    s = re.split('{(.*?)}', pattern)
     counts = {}
     for i in range(0, len(s), 2):
         s[i] = re.escape(s[i])

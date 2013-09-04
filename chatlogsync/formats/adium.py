@@ -1,6 +1,8 @@
 from __future__ import unicode_literals
 from __future__ import absolute_import
 
+# TODO: handle <action>
+
 import os
 import codecs
 import shutil
@@ -42,16 +44,23 @@ class Adium(ChatlogFormat):
                      'windowOpened': Event.WINDOWOPENED,
                      }
 
-    FILE_PATTERN = ('Logs/<service>.<source>/'
-                    '<destination>/'
-                    '<destination> (<time>).chatlog/'
-                    '<destination> (<time>).xml')
+    FILE_PATTERN = ('/Logs/{service}.{source}/'
+                    '{destination}/'
+                    '{destination} ({time}).chatlog/'
+                    '{destination} ({time}).xml')
     IMAGE_DIRECTORY = '.'
     TIME_FMT_FILE = '%Y-%m-%dT%H.%M.%S%z'
     STRPTIME_FMT_FILE = '%Y-%m-%dT%H.%M.%S'
     TIME_FMT_CONVERSATION = '%Y-%m-%dT%H:%M:%S%z'
     STRPTIME_FMT_CONVERSATION = '%Y-%m-%dT%H:%M:%S'
     XMLNS = "http://purl.org/net/ulf/ns/0.4-02"
+    XML_HEADER = '<?xml version="1.0" encoding="UTF-8" ?>'
+
+    ATTRS = {'chat': ('xmlns', 'account', 'service'),
+             'message': ('sender', 'time', 'auto', 'alias'),
+             'status': ('type', 'sender', 'time', 'alias'),
+             'event': ('type', 'sender', 'time', 'alias'),
+             }
 
     def _parse_ftime(self, timestr):
         ts1, ts2 = timestr[:-5], timestr[-5:]
@@ -84,28 +93,48 @@ class Adium(ChatlogFormat):
 
     def parse_conversation(self, conversation):
         with codecs.open(conversation.path, encoding='utf-8') as f:
-            soup = BeautifulSoup(f, ['lxml', 'xml'])
-        chat = soup.chat
-        header_comment = chat.previous
-        if isinstance(header_comment, Comment):
-            conversation.original_parser_name = header_comment.split('/')[1]
-        else:
-            conversation.original_parser_name = self.type
+            data = f.read().strip()
+            lines = data.split('\n')
 
-        status_html = []
-        for e in soup.chat.children:
-            if not isinstance(e, Tag):
-                if isinstance(e, Comment):
-                    status_html = [NavigableString(e)]
+        xml_header = lines.pop(0)
+        conversation.original_parser_name = self.type
+        for e in BeautifulSoup(lines.pop(0), ['lxml', 'xml']).children:
+            if isinstance(e, Comment):
+                conversation.original_parser_name = e.split('/')[1]
+            else:
+                service = self.SERVICE_MAP[e.get('service')]
+                source = e.get('account')
+
+        for line in lines:
+            if line == "</chat>":
                 continue
+            cons, attrs = self._parse_line(line, conversation)
+            try:
+                conversation.entries.append(cons(**attrs))
+            except Exception as err:
+                print_e("Problem with element %s" % e)
+                raise err
 
-            attrs = {}
+        if source != conversation.source or service != conversation.service:
+            raise ParseError("mismatch between path and chatinfo for '%s" %
+                             conversation.path)
+
+        return conversation
+
+    def _parse_line(self, line, conversation):
+        """Return (cons, attrs)"""
+        status_html = []
+        attrs = {}
+        cons = None
+
+        for e in BeautifulSoup(line, ['lxml', 'xml']).children:
+            if isinstance(e, Comment):
+                status_html = [NavigableString(e)]
+                continue
             for a in ('alias', 'sender', 'auto', 'time'):
                 attrs[a] = e.get(a, '')
 
-            # isuser
             attrs['isuser'] = attrs['sender'] == conversation.source
-
             attrs['auto'] = True if attrs['auto'] else False
             if attrs['time']:
                 attrs['time'] = self._parse_ctime(attrs['time'])
@@ -128,22 +157,11 @@ class Adium(ChatlogFormat):
             if not attrs['sender'] and not attrs['alias']:
                 print_d("%s is a system entry" % e)
                 attrs['system'] = True
-            try:
-                conversation.entries.append(cons(**attrs))
-            except Exception as err:
-                print_e("Problem with element %s" % e)
-                raise err
 
-            # clear status_html
-            status_html = []
+        if not cons:
+            raise(ParseError("could not parse line: '%s'" % line))
 
-        source = chat.get('account')
-        service = self.SERVICE_MAP[chat.get('service')]
-        if source != conversation.source or service != conversation.service:
-            raise ParseError("mismatch between path and chatinfo for '%s" %
-                             conversation.path)
-
-        return conversation
+        return cons, attrs
 
     def write(self, path, conversations):
         if len(conversations) != 1:
@@ -151,18 +169,17 @@ class Adium(ChatlogFormat):
                 ("'%s' only supports one conversation per file:"
                  "\n  %s has %i") % (self.type, path, len(conversations))
                 )
-
         conversation = conversations[0]
-        soup = BeautifulSoup(features='xml')
-        chat = soup.new_tag(name='chat')
-        soup.append(Comment(const.HEADER_COMMENT %
-                            conversation.original_parser_name))
-        soup.append(chat)
 
-        chat['xmlns'] = self.XMLNS
-        chat['account'] = conversation.source
-        chat['service'] = self.PAM_ECIVRES[conversation.service]
-        chat.append('\n')
+        fh = codecs.open(path, 'wb', 'utf-8')
+        fh.write(self.XML_HEADER+'\n')
+        attrs = dict(xmlns=self.XMLNS, account=conversation.source,
+                     service=self.PAM_ECIVRES[conversation.service])
+
+        self._write_comment(fh, const.HEADER_COMMENT %
+                            conversation.original_parser_name)
+        self._write_xml(fh, 'chat', attrs, close=False)
+        fh.write('\n')
 
         for i, entry in enumerate(conversation.entries):
             attrs = dict(alias=entry.alias, sender=entry.sender)
@@ -176,40 +193,34 @@ class Adium(ChatlogFormat):
             elif isinstance(entry, Event):
                 name = 'event'
                 attrs['type'] = self.PAMEPYT_TNEVE[entry.type]
+
             if entry.system: # no alias or sender for these
                 del attrs['alias']
                 del attrs['sender']
             elif not attrs['alias']:
                 del attrs['alias']
-            elem = soup.new_tag(name=name, **attrs)
 
             f1 = self.TIME_FMT_CONVERSATION[:-2]
             f2 = self.TIME_FMT_CONVERSATION[-2:]
             v1 = entry.time.strftime(f1)
             v2 = entry.time.strftime(f2)
             v = v1+v2[:3]+':'+v2[3:]
-            elem['time'] = v
+            attrs['time'] = v
 
             if isinstance(entry, Status) and entry.type in Status.USER_TYPES:
                 htmlattr = 'msg_html'
-                textattr = 'msg_text'
-                comment_text = ''.join([x.string for x in entry.html]) \
-                    if entry.html else entry.text
-   		if comment_text:
-                    chat.append(Comment(comment_text))
+                if entry.has_other_html:
+                    self._write_comment(fh, ''.join([x.string for x
+                                                     in entry.html]))
             else:
                 htmlattr = 'html'
-                textattr = 'text'
 
-            if not getattr(entry, htmlattr):
-                elem.append(getattr(entry, textattr))
-            else:
-                for html in getattr(entry, htmlattr):
-                    elem.append(html)
-
-            chat.append(elem)
+            self._write_xml(fh, name, attrs, contents=getattr(entry, htmlattr))
             if i != len(conversation.entries)-1:
-                chat.append('\n')
+                fh.write('\n')
+
+        fh.write('</chat>')
+        fh.close()
 
         # images
         dstdir = dirname(path)
@@ -218,9 +229,25 @@ class Adium(ChatlogFormat):
             if srcpath != realpath(dstpath):
                 shutil.copy(srcpath, dstpath)
 
-        # newline at end
-        soup.append('\n')
-        with codecs.open(path, 'wb', 'utf-8') as fh:
-            fh.write(soup.decode())
+    def _write_comment(self, fh, text):
+        fh.write(Comment(text).output_ready())
+
+    def _write_xml(self, fh, name, attrs, contents=[], close=True):
+        attrlist = []
+        for n in self.ATTRS[name]:
+            v = attrs.get(n, None)
+            if v:
+                attrlist.append((n, v))
+        attrstr = " ".join(['%s="%s"' % (n,v)  for n, v in attrlist])
+        fh.write("<%s %s>" % (name, attrstr))
+
+        for e in contents:
+            if isinstance(e, Tag):
+                fh.write(e.decode())
+            else:
+                fh.write(e.output_ready())
+
+        if close:
+            fh.write("</%s>" % name)
 
 formats = [Adium]
