@@ -18,8 +18,10 @@ else:
 
 import time
 import datetime
+from dateutil.tz import tzoffset
 from os.path import join, dirname, isfile, realpath
 
+from bs4 import BeautifulSoup
 from bs4.element import NavigableString, PageElement
 
 from chatlogsync import util
@@ -206,6 +208,45 @@ class Entry(object):
         for e in self._html:
             _validate_argument(e, 'html', PageElement)
 
+    def __eq__(self, other):
+        if other.__class__ != self.__class__:
+            return False
+        equal = True
+        for k, v in iter(vars(other.__class__).items()):
+            if isinstance(v, property) and \
+                    getattr(self, k) != getattr(other, k):
+                equal = False
+                break
+
+        return equal
+
+    def __ne__(self, other):
+        return not self == other
+
+    def dump(self):
+        d = {}
+        for k, v in iter(vars(self).items()):
+            if k.startswith("_"):
+                k = k[1:]
+            if 'html' in k:
+                v = [str(v) for v in v]
+            d[k] = v
+        return "%s %r" % (self.__class__.__name__, d)
+
+    @classmethod
+    def from_dump(cls, dump):
+        """Return (constructor, kwargs)"""
+        name, kwargs_str = dump.split(' ', 1)
+        kwargs = eval(kwargs_str)
+        for k, v in iter(kwargs.items()):
+            if 'html' in k and v:
+                html = []
+                for h in v:
+                    html.extend(list(BeautifulSoup(h).body.children))
+                kwargs[k] = html
+
+        return globals()[name], kwargs
+
     @property
     def alias(self):
         return self._alias
@@ -302,7 +343,7 @@ class Status(Entry):
 
     def __init__(self,  **kwargs):
         self._msg_text = ''
-        self._msg_html = ''
+        self._msg_html = []
         atype = kwargs.get('type', None)
         if atype < self._MIN or atype > self._MAX:
             raise TypeError("unknown type %r for status" % atype)

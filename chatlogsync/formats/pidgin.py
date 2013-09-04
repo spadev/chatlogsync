@@ -2,6 +2,7 @@ from __future__ import unicode_literals
 from __future__ import absolute_import
 
 # TODO: add support for multi-user chats
+# TODO: handle attached files
 
 import re
 import sys
@@ -16,7 +17,7 @@ from bs4.element import Tag, NavigableString, Comment
 from chatlogsync import util, const, timezones
 from chatlogsync.formats._base import ChatlogFormat
 from chatlogsync.errors import ParseError, ArgumentError
-from chatlogsync.conversation import Conversation, Message, Status, Event
+from chatlogsync.conversation import Conversation, Message, Status, Event, Entry
 from chatlogsync.timezones import getoffset
 
 class PidginHtml(ChatlogFormat):
@@ -81,13 +82,12 @@ class PidginHtml(ChatlogFormat):
     def parse_conversation(self, conversation):
         with codecs.open(conversation.path, encoding='utf-8') as f:
             data = f.read()
-            lines = data.split('<br/>\n')
+            lines = data.split('\n')
             if not lines[-1]:
                 del lines[-1]
-            if lines[-1].startswith('</body></html>'):
+            if lines[-1].endswith('</html>'):
                 del lines[-1]
-        title_line, first_line = lines[0].split('\n', 1)
-        lines[0] = first_line
+        title_line = lines.pop(0)
         info, conversation.original_parser_name = \
             self._parse_title(title_line, conversation)
 
@@ -104,11 +104,21 @@ class PidginHtml(ChatlogFormat):
         ignore_aliases = set()
         ignore_colors = set()
         attrs_list = []
-        for line in lines:
+        i = 0
+        while i < len(lines):
+            line = lines[i]
+            while True:
+                if line.endswith('<br/>'):
+                    line = line[:-5]
+                    break
+                elif line.startswith('<!--'):
+                    break
+                line += '\n'+lines[i+1]
+                i += 1
+            i += 1
             try:
-                cons, attrs = \
-                    self._parse_line(line, conversation, prev_time,
-                                     senders_by_color)
+                cons, attrs = self._parse_line(line, conversation, prev_time,
+                                               senders_by_color)
             except ArgumentError as e:
                 print_e('Error on line %s' % line)
                 raise e
@@ -192,6 +202,14 @@ class PidginHtml(ChatlogFormat):
             return None, None
 
         fonttag = soup.font
+
+        # unrepresentable entry dump
+        if not fonttag:
+            cons, attrs = Entry.from_dump(soup.text)
+            if 'color' not in attrs:
+                attrs['color'] = None
+            return cons, attrs
+
         attrs['color'] = fonttag.get('color')
         if attrs['color'] == self.ALTERNATE_COLOR:
             attrs['alternate'] = True
@@ -407,6 +425,8 @@ class PidginHtml(ChatlogFormat):
                 body.append(timetag)
                 body.append(msgtag)
         else:
+            body.append(Comment(entry.dump()))
+            body.append('\n')
             return False
         return True
 

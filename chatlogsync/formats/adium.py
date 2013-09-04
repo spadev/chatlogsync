@@ -8,7 +8,7 @@ import datetime
 from os.path import join, dirname, relpath, realpath
 
 from bs4 import BeautifulSoup
-from bs4.element import Tag, Comment
+from bs4.element import Tag, Comment, NavigableString
 
 from chatlogsync import util, const
 from chatlogsync.formats._base import ChatlogFormat
@@ -31,13 +31,12 @@ class Adium(ChatlogFormat):
                       'connected': Status.CONNECTED,
                       'away': Status.AWAY,
                       'idle': Status.IDLE,
+                      'mobile': Status.MOBILE,
                       'purple': Status.SYSTEM,
                       'available': Status.AVAILABLE,
                       'chat-error': Status.ERROR,
                       }
 
-    MSG_STATUSTYPES = (Status.OFFLINE, Status.ONLINE, Status.AVAILABLE,
-                       Status.AWAY, Status.IDLE)
 
     EVENT_TYPEMAP = {'windowClosed': Event.WINDOWCLOSED,
                      'windowOpened': Event.WINDOWOPENED,
@@ -93,8 +92,11 @@ class Adium(ChatlogFormat):
         else:
             conversation.original_parser_name = self.type
 
+        status_html = []
         for e in soup.chat.children:
             if not isinstance(e, Tag):
+                if isinstance(e, Comment):
+                    status_html = [NavigableString(e)]
                 continue
 
             attrs = {}
@@ -112,9 +114,9 @@ class Adium(ChatlogFormat):
             if e.name == 'status':
                 cons = Status
                 attrs['type'] = self.STATUS_TYPEMAP.get(e.get('type'), None)
-                if attrs['type'] in self.MSG_STATUSTYPES:
+                if attrs['type'] in Status.USER_TYPES:
                     attrs['msg_html'] = attrs['html']
-                    del attrs['html']
+                    attrs['html'] = status_html
             elif e.name == 'event':
                 cons = Event
                 attrs['type'] = self.EVENT_TYPEMAP.get(e.get('type'), None)
@@ -131,6 +133,9 @@ class Adium(ChatlogFormat):
             except Exception as err:
                 print_e("Problem with element %s" % e)
                 raise err
+
+            # clear status_html
+            status_html = []
 
         source = chat.get('account')
         service = self.SERVICE_MAP[chat.get('service')]
@@ -185,9 +190,13 @@ class Adium(ChatlogFormat):
             v = v1+v2[:3]+':'+v2[3:]
             elem['time'] = v
 
-            if isinstance(entry, Status) and entry.type in self.MSG_STATUSTYPES:
+            if isinstance(entry, Status) and entry.type in Status.USER_TYPES:
                 htmlattr = 'msg_html'
                 textattr = 'msg_text'
+                comment_text = ''.join([x.string for x in entry.html]) \
+                    if entry.html else entry.text
+   		if comment_text:
+                    chat.append(Comment(comment_text))
             else:
                 htmlattr = 'html'
                 textattr = 'text'
