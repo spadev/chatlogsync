@@ -88,10 +88,6 @@ class Conversation(object):
     @property
     def isgroup(self):
         return self._isgroup
-    @isgroup.setter
-    def isgroup(self, isgroup):
-        self._isgroup = isgroup
-
     @property
     def source(self):
         return self._source

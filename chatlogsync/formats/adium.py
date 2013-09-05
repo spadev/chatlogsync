@@ -4,6 +4,7 @@ from __future__ import absolute_import
 # TODO: handle <action>
 
 import os
+import re
 import codecs
 import shutil
 import datetime
@@ -70,6 +71,8 @@ class Adium(ChatlogFormat):
                          if c.service == 'facebook' else s),
                     }
 
+    SENDER_RE = re.compile('<[^<>]*sender="(?P<sender>.*?)".*?>')
+
     def _parse_ftime(self, timestr):
         ts1, ts2 = timestr[:-5], timestr[-5:]
         t = datetime.datetime.strptime(ts1, self.STRPTIME_FMT_FILE)
@@ -80,6 +83,13 @@ class Adium(ChatlogFormat):
         t = datetime.datetime.strptime(ts1, self.STRPTIME_FMT_CONVERSATION)
         return t.replace(tzinfo = getoffset(None, ts2))
 
+    def _is_group(self, lines, path, source, destination):
+        senders = set((source, destination, None))
+        for line in lines:
+            m = self.SENDER_RE.search(line)
+            if m and m.group('sender') not in senders:
+                return True
+        return False
 
     def parse_path(self, path):
         info = util.parse_string(path, self.FILE_PATTERN)
@@ -91,6 +101,11 @@ class Adium(ChatlogFormat):
         service = self.SERVICE_MAP[info['service']]
         source = info['source']
 
+        with codecs.open(path, encoding='utf-8') as f:
+            data = f.read().strip()
+            lines = data.split('\n')
+        isgroup = self._is_group(lines, path, source, destination)
+
         dp = join(dirname(path), self.IMAGE_DIRECTORY)
         images = [relpath(join(dp, x), start=dp) for x in os.listdir(dp)
                   if not x.endswith('.xml')]
@@ -98,15 +113,14 @@ class Adium(ChatlogFormat):
         # create conversation with tranformed source
         conversation = Conversation(self, path, source, destination,
                                     service, time, entries=[], images=images,
+                                    isgroup=isgroup,
                                     transforms=self.TRANSFORMS)
+        conversation.lines = lines
 
         return [conversation]
 
     def parse_conversation(self, conversation):
-        with codecs.open(conversation.path, encoding='utf-8') as f:
-            data = f.read().strip()
-            lines = data.split('\n')
-
+        lines = conversation.lines
         xml_header = lines.pop(0)
         conversation.original_parser_name = self.type
         for e in BeautifulSoup(lines.pop(0), ['lxml', 'xml']).children:
@@ -160,13 +174,8 @@ class Adium(ChatlogFormat):
             if attrs['sender'] == source:
                 attrs['sender'] = transformed_source
                 attrs['isuser'] = True
-            elif attrs['sender'] == conversation.destination:
-                attrs['isuser'] = False
             else:
                 attrs['isuser'] = False
-                # if sender is not source or destination, this is a group chat
-                if attrs['sender']:
-                    conversation.isgroup = True
 
             attrs['auto'] = True if attrs['auto'] else False
             if attrs['time']:

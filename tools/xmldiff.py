@@ -22,9 +22,11 @@ def parse_args():
 
 def xmldiff(options):
     n = 0
-    for file1, file2 in diff.gather_files('*.xml'):
-        n  += diff.diff(file1, file2, ignore_comments=options.ignore_comments,
-                        adium=True)
+    for file1, file2 in diff.gather_files('*.xml', options.source,
+                                          options.destination):
+        n  += diff.diff(file1, file2, options.source, options.destination,
+                        ignore_comments=options.ignore_comments,
+                        adium=options.adium)
 
     return n
 

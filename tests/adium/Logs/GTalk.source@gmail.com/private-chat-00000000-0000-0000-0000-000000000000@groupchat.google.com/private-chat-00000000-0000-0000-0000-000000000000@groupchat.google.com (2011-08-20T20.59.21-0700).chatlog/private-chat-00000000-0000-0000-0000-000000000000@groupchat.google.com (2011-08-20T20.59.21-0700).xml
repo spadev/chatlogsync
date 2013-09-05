@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<chat xmlns="http://purl.org/net/ulf/ns/0.4-02" account="source@gmail.com" service="GTalk">
+<status type="purple" time="2011-08-20T20:59:21-07:00">A_gmail.com entered the room.</status>
+<status type="purple" time="2011-08-20T20:59:21-07:00">B_gmail.com entered the room.</status>
+<message sender="A_gmail.com" time="2011-08-20T20:59:25-07:00">test</message>
+<message sender="source@gmail.com" time="2011-08-20T20:59:28-07:00" alias="source">what</message>
+<message sender="B_gmail.com" time="2011-08-20T20:59:31-07:00">test2</message></chat>

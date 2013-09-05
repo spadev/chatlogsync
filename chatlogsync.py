@@ -24,13 +24,15 @@ class Progress(object):
         self._nerror = Value('i', 0, lock=False)
         self._lock = Lock()
 
-    def print_status(self, msg):
+    def print_status(self, msg=None):
         dryrun = ' (DRY RUN)' if const.DRYRUN else ''
-        print_v(msg)
+        if msg:
+            print_v(msg)
         print_('\r[read:%i wrote:%i existing:%i error:%i]%s ' %
                (self.nread, self.nwrote, self.nexisting, self.nerror, dryrun),
                end='', flush=True, file=sys.stderr)
-        print_v('\n')
+        if msg:
+            print_v('\n')
 
     def _incr(self, var, n=1):
         with self._lock:
@@ -108,7 +110,6 @@ class Parser(Process):
         # file is not a chatlog
         if not parsed:
             return None
-
         self.progress.read(path)
 
         wmodule = self._modules_map[self.outformat] \
@@ -127,6 +128,7 @@ class Parser(Process):
                 self._files[real_dstpath] = f
                 if f:
                     self.progress.existing(dstpath)
+                    self.progress.print_status()
                     if not self.force:
                         continue
             if const.DRYRUN:

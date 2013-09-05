@@ -23,8 +23,10 @@ def parse_args():
 
 def htmldiff(options):
     n = 0
-    for file1, file2 in diff.gather_files('*.html'):
-        n  += diff.diff(file1, file2, ignore_comments=options.ignore_comments,
+    for file1, file2 in diff.gather_files('*.html', options.source,
+                                          options.destination):
+        n  += diff.diff(file1, file2, options.source, options.destination,
+                        ignore_comments=options.ignore_comments,
                         pidgin=options.pidgin)
     return n
 

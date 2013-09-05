@@ -5,7 +5,7 @@ import fnmatch
 import os
 import re
 import sys
-from os.path import join, relpath, isfile, isdir, dirname
+from os.path import join, relpath, isfile, isdir, dirname, commonprefix
 from difflib import context_diff
 from argparse import ArgumentParser, ArgumentTypeError
 
@@ -25,21 +25,15 @@ def isnotfile(value):
 
     return value
 
-def gather_files(pattern):
-    if len(sys.argv) < 3:
-        print('need two topdirs', file=sys.stderr)
-        sys.exit(1)
-
-    top1, top2 = sys.argv[1:3]
-
+def gather_files(pattern, source, destination):
     paths = []
-    if isfile(top1) and isfile(top2):
-        paths.append((top1, top2))
+    if isfile(source) and isfile(destination):
+        paths.append((source, destination))
 
-    for root, tops, files in os.walk(top1):
+    for root, tops, files in os.walk(source):
         for f in fnmatch.filter(files, pattern):
             p1 = join(root, f)
-            p2 = join(top2, relpath(p1, start=top1))
+            p2 = join(destination, relpath(p1, start=source))
             if not isfile(p2):
                 p2 = None
             paths.append((p1, p2))
@@ -92,12 +86,14 @@ def check_images(soup, path, lines):
 
     return n
 
-def diff(file1, file2, ignore_comments=False, pidgin=False, adium=False,
-         images=True):
+def diff(file1, file2, dir1, dir2,
+         ignore_comments=False, pidgin=False, adium=False, images=True):
     n = 0
 
     if not file2:
-        print("%s only exists in source directory" % file1)
+        cp = commonprefix([dir1, dir2])
+        path = file1.replace(cp, '')
+        print("%s only exists in %s" % (path, dir1))
         print(DIVIDER)
         return 1
 
