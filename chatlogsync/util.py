@@ -5,8 +5,12 @@ import os
 import re
 import datetime
 from os.path import join, isfile
+from bs4.element import Comment
 
 from chatlogsync.errors import ParseError
+
+def write_comment(fh, comment_text):
+    fh.write(Comment(comment_text).output_ready())
 
 def parse_string(string, pattern):
     s = re.split('{(.*?)}', pattern)

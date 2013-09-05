@@ -2,7 +2,6 @@ from __future__ import unicode_literals
 from __future__ import absolute_import
 
 # TODO: handle attached images
-# TODO: write real sender as comment in groupchat
 
 import re
 import sys
@@ -119,8 +118,8 @@ class PidginHtml(ChatlogFormat):
         """Return (line, comment)"""
         data = self.COMMENT_RE.split(line)
         if len(data) == 3:
-            l = data[1]
-            comment = data[2]
+            comment = data[1]
+            l = data[2]
         else:
             l = data[0]
             comment = ''
@@ -264,7 +263,7 @@ class PidginHtml(ChatlogFormat):
                 attrs['sender'] = conversation.source
                 attrs['isuser'] = True
             elif conversation.isgroup: # groupchats don't use aliases
-                attrs['sender'] = attrs['alias']
+                attrs['sender'] = comment if comment else attrs['alias']
             elif color == self.DESTINATION_COLOR:
                 attrs['sender'] = conversation.destination
                 attrs['isuser'] = False
@@ -356,8 +355,8 @@ class PidginHtml(ChatlogFormat):
                                      self.TIME_FMT_TITLE)
         titlestr = NavigableString(titlestr).output_ready()
         fh = codecs.open(path, 'wb', 'utf-8')
-        fh.write(Comment(const.HEADER_COMMENT %
-                         conversation.original_parser_name).output_ready())
+        util.write_comment(fh, const.HEADER_COMMENT %
+                           conversation.original_parser_name)
         fh.write(self.TITLE_LINE_FMT % (titlestr, titlestr) + '\n')
 
         for entry in conversation.entries:
@@ -383,6 +382,10 @@ class PidginHtml(ChatlogFormat):
             autoreply = self.AUTOREPLY_HTML if entry.auto else ''
             timestr = entry.time.strftime(timefmt)
 
+            # write real sender in groupchat Message
+            if conversation.isgroup and entry.alias:
+                util.write_comment(fh, entry.sender)
+
             fh.write(self.MESSAGE_LINE_FMT % (color, timestr, name, autoreply))
             self._write_entry_html(fh, entry)
             fh.write(self.MESSAGE_LINE_END)
@@ -392,7 +395,7 @@ class PidginHtml(ChatlogFormat):
                 text = "%s|%s|%s" % (entry.type,
                                      '1' if entry.system else '',
                                      entry.sender)
-                fh.write(Comment(text).output_ready())
+                util.write_comment(fh, text)
 
             if entry.type == Status.ERROR:
                 fmt = self.ERROR_LINE_FMT
@@ -405,7 +408,7 @@ class PidginHtml(ChatlogFormat):
             self._write_entry_html(fh, entry)
             fh.write(end)
         else:
-            fh.write(Comment(entry.dump()).output_ready())
+            util.write_comment(fh, entry.dump())
 
     def _write_entry_html(self, fh, entry):
         for e in entry.html:

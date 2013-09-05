@@ -134,7 +134,15 @@ class Adium(ChatlogFormat):
             for a in ('alias', 'sender', 'auto', 'time'):
                 attrs[a] = e.get(a, '')
 
-            attrs['isuser'] = attrs['sender'] == conversation.source
+            if attrs['sender'] == conversation.source:
+                attrs['isuser'] = True
+            elif attrs['sender'] == conversation.destination:
+                attrs['isuser'] = False
+            else:
+                attrs['isuser'] = False
+                # if user is not source or destination, this is a group chat
+                conversation.isgroup = True
+
             attrs['auto'] = True if attrs['auto'] else False
             if attrs['time']:
                 attrs['time'] = self._parse_ctime(attrs['time'])
@@ -176,8 +184,8 @@ class Adium(ChatlogFormat):
         attrs = dict(xmlns=self.XMLNS, account=conversation.source,
                      service=self.PAM_ECIVRES[conversation.service])
 
-        self._write_comment(fh, const.HEADER_COMMENT %
-                            conversation.original_parser_name)
+        util.write_comment(fh, const.HEADER_COMMENT %
+                           conversation.original_parser_name)
         self._write_xml(fh, 'chat', attrs, close=False)
         fh.write('\n')
 
@@ -210,8 +218,8 @@ class Adium(ChatlogFormat):
             if isinstance(entry, Status) and entry.type in Status.USER_TYPES:
                 htmlattr = 'msg_html'
                 if entry.has_other_html:
-                    self._write_comment(fh, ''.join([x.string for x
-                                                     in entry.html]))
+                    util.write_comment(fh, ''.join([x.string for x
+                                                    in entry.html]))
             else:
                 htmlattr = 'html'
 
@@ -228,9 +236,6 @@ class Adium(ChatlogFormat):
             dstpath = join(dstdir, img_relpath)
             if srcpath != realpath(dstpath):
                 shutil.copy(srcpath, dstpath)
-
-    def _write_comment(self, fh, text):
-        fh.write(Comment(text).output_ready())
 
     def _write_xml(self, fh, name, attrs, contents=[], close=True):
         attrlist = []
