@@ -81,7 +81,7 @@ class Adium(ChatlogFormat):
     def _parse_ctime(self, timestr):
         ts1, ts2 = timestr[:-6], timestr[-6:].replace(':', '')
         t = datetime.datetime.strptime(ts1, self.STRPTIME_FMT_CONVERSATION)
-        return t.replace(tzinfo = getoffset(None, ts2))
+        return t.replace(tzinfo=getoffset(None, ts2))
 
     def _is_group(self, lines, path, source, destination):
         senders = set((source, destination, None))

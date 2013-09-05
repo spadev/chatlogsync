@@ -62,6 +62,7 @@ def init():
 
         tzabbrevs[name] = abbrev
         tzoffsets_i[name] = offset_i
+        tzoffsets_i[offset_s] = offset_i
         tzoffsets_s[name] = offset_s
 
     for k in iter(tznames.keys()):
@@ -88,5 +89,7 @@ def getoffset(abbrev, offset):
     if not offset:
         name = tznames[abbrev][0][0]
         offset = tzoffsets_i[name]
+    elif not isinstance(offset, int):
+        offset = tzoffsets_i[offset]
 
     return dtz.tzoffset(abbrev, offset)

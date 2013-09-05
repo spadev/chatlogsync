@@ -32,6 +32,7 @@ class PidginHtml(ChatlogFormat):
     FILE_PATTERN = ('/logs/{service}/{source}/{destination}{isgroup .chat}/'
                     '{time}.html')
     TIME_FMT_FILE = '%Y-%m-%d.%H%M%S%z%Z'
+    STRPTIME_FMT_FILE = '%Y-%m-%d.%H%M%S'
     TITLE_PATTERN = _("Conversation with {destination} "
                       "at {time} on {source} ({service})")
 
@@ -74,7 +75,6 @@ class PidginHtml(ChatlogFormat):
     COMMENT_RE = re.compile('^%s(?P<commentstr>.*?)%s' % (Comment.PREFIX,
                                                           Comment.SUFFIX))
     SOURCE_RE = re.compile('/[^/]*$')
-    TIME_RE = re.compile('([+-]\d+)([^0-9- ]+)')
 
     TIME_FMT_CONVERSATION = "(%X)"
     TIME_FMT_CONVERSATION_WITH_DATE = "(%x %X)"
@@ -100,8 +100,6 @@ class PidginHtml(ChatlogFormat):
         if not info:
             return None
 
-        timestr = info['time'].replace('.', ' ')
-        info['time'] = self.TIME_RE.sub(r'\2 \1', timestr)
         self._parse_info(info)
         if info['destination'] == '.system':
             print_d('Ignoring system log %s' % path)
@@ -228,10 +226,17 @@ class PidginHtml(ChatlogFormat):
                     info['source'].endswith('@chat.facebook.com'):
                 info['service'] = 'facebook'
 
-        info['time'] = parse(info['time'], tzinfos=getoffset)
-        if not info['time'].tzname():
-            newtzinfo = conversation.time.tzinfo
-            info['time'] = info['time'].replace(tzinfo=newtzinfo)
+
+        if not conversation: # parsing a path
+            pos = info['time'].rfind('-')
+            ts1, ts2 = info['time'][:pos], info['time'][pos:]
+            t = datetime.datetime.strptime(ts1, self.STRPTIME_FMT_FILE)
+            info['time'] = t.replace(tzinfo=getoffset(ts2[5:], ts2[:5]))
+        else:
+            info['time'] = parse(info['time'], tzinfos=getoffset)
+            if not info['time'].tzname():
+                newtzinfo = conversation.time.tzinfo
+                info['time'] = info['time'].replace(tzinfo=newtzinfo)
 
         return info
 
