@@ -230,8 +230,7 @@ class PidginHtml(ChatlogFormat):
 
     def _parse_line(self, line, conversation, base_time):
         """Return (cons, attrs)"""
-        attrs = dict(alias=None, time=None, sender=conversation.source,
-                     type=None, html=None)
+        attrs = dict(alias=None, time=None, sender=None, type=None, html=None)
         line, comment = self._get_line_data(line)
         if not line and not comment:
             print_d("Skipping line %s" % line)
