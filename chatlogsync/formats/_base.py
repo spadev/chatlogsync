@@ -3,6 +3,8 @@ from __future__ import absolute_import
 
 import re
 import datetime
+import shutil
+from os.path import dirname, join, realpath
 
 class ChatlogFormat(object):
     type = 'unknown format'
@@ -16,6 +18,7 @@ class ChatlogFormat(object):
     TIME_FMT_FILE = ''
     TRANSFORMS = {}
     UNTRANSFORMS = {}
+    IMAGE_DIRECTORY = ''
 
     def __init__(self):
         if not self.PAM_ECIVRES:
@@ -27,6 +30,16 @@ class ChatlogFormat(object):
         if not self.PAMEPYT_TNEVE:
             self.PAMEPYT_TNEVE = {v: k for (k, v) in
                                   iter(self.EVENT_TYPEMAP.items())}
+
+    def copy_images(self, path, conversation):
+        if not self.IMAGE_DIRECTORY:
+            raise NotImplementedError
+
+        dstdir = join(dirname(path), self.IMAGE_DIRECTORY)
+        for img_relpath, srcpath in conversation.images_full:
+            dstpath = join(dstdir, img_relpath)
+            if srcpath != realpath(dstpath):
+                shutil.copy(srcpath, dstpath)
 
     def get_path(self, conversation):
         if not self.FILE_PATTERN:

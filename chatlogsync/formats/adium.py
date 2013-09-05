@@ -7,7 +7,7 @@ import os
 import codecs
 import shutil
 import datetime
-from os.path import join, dirname, relpath, realpath
+from os.path import join, dirname, relpath
 
 from bs4 import BeautifulSoup
 from bs4.element import Tag, Comment, NavigableString
@@ -91,7 +91,7 @@ class Adium(ChatlogFormat):
         service = self.SERVICE_MAP[info['service']]
         source = info['source']
 
-        dp = dirname(path)
+        dp = join(dirname(path), self.IMAGE_DIRECTORY)
         images = [relpath(join(dp, x), start=dp) for x in os.listdir(dp)
                   if not x.endswith('.xml')]
 
@@ -266,12 +266,7 @@ class Adium(ChatlogFormat):
         fh.write('</chat>')
         fh.close()
 
-        # images
-        dstdir = dirname(path)
-        for img_relpath, srcpath in conversation.images_full:
-            dstpath = join(dstdir, img_relpath)
-            if srcpath != realpath(dstpath):
-                shutil.copy(srcpath, dstpath)
+        self.copy_images(path, conversation)
 
     def _write_xml(self, fh, name, attrs, contents=[], close=True):
         attrlist = []

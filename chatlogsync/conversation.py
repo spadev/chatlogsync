@@ -110,14 +110,19 @@ class Conversation(object):
     @property
     def parsedby(self):
         return self._parsedby
+
     @property
     def images(self):
         """List of relative paths of images in in conversation"""
         return self._images
+    @images.setter
+    def images(self, images):
+        self.__validate_images(images)
     @property
     def images_full(self):
         """List of (relative path, full path) of images in in conversation"""
         return self._images_full
+
     @property
     def entries(self):
         return self._entries

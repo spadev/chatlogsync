@@ -5,14 +5,14 @@ import fnmatch
 import os
 import re
 import sys
-from os.path import join, relpath, isfile, isdir
+from os.path import join, relpath, isfile, isdir, dirname
 from difflib import context_diff
 from argparse import ArgumentParser, ArgumentTypeError
 
 from bs4 import BeautifulSoup
 from bs4.element import Comment
 
-DIVIDER = "\n"+"-"*80+'\n'
+DIVIDER = "\n"+"="*80+'\n'
 def isdirectory(value):
     if not isdir(value):
         raise ArgumentTypeError("'%s' is not a file or directory" % value)
@@ -35,6 +35,7 @@ def gather_files(pattern):
     paths = []
     if isfile(top1) and isfile(top2):
         paths.append((top1, top2))
+
     for root, tops, files in os.walk(top1):
         for f in fnmatch.filter(files, pattern):
             p1 = join(root, f)
@@ -80,8 +81,21 @@ def get_argument_parser(prog, description):
                         )
     return parser
 
-def diff(file1, file2, ignore_comments=False, pidgin=False, adium=False):
+def check_images(soup, path, lines):
+    basedir = dirname(path)
     n = 0
+    for img_path in [x.get('src') for x in soup.find_all('img')]:
+        p = join(basedir, img_path)
+        if not isfile(p):
+            lines.append('expected image at %r' % p)
+            n += 1
+
+    return n
+
+def diff(file1, file2, ignore_comments=False, pidgin=False, adium=False,
+         images=True):
+    n = 0
+
     if not file2:
         print("%s only exists in source directory" % file1)
         print(DIVIDER)
@@ -102,10 +116,14 @@ def diff(file1, file2, ignore_comments=False, pidgin=False, adium=False):
         soup1 = normalize_adium(soup1)
         soup2 = normalize_adium(soup2)
 
+    lines = ['%s %s\n' % (file1, file2)]
+    if images:
+        n += check_images(soup1, file1, lines)
+        n += check_images(soup2, file2, lines)
+
     html1 = soup1.prettify().split('\n')
     html2 = soup2.prettify().split('\n')
 
-    lines = ['%s %s' % (file1, file2)]
     for l in context_diff(html1, html2):
         n += 1
         lines.append(l)

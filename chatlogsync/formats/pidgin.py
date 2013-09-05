@@ -1,8 +1,6 @@
 from __future__ import unicode_literals
 from __future__ import absolute_import
 
-# TODO: handle attached images
-
 import re
 import sys
 import codecs
@@ -21,6 +19,8 @@ from chatlogsync.timezones import getoffset
 
 class PidginHtml(ChatlogFormat):
     type = 'pidgin-html'
+    IMAGE_DIRECTORY = '.'
+
     SERVICE_MAP = {'jabber': 'jabber',
                    'aim': 'aim',
                    }
@@ -185,14 +185,17 @@ class PidginHtml(ChatlogFormat):
 
             attrs_list.append((cons, attrs))
 
-        conversation.entries = \
-            self._get_entries(conversation, senders_by_alias, attrs_list)
+        conversation.entries, conversation.images = \
+            self._get_entries_and_images(conversation, senders_by_alias,
+                                         attrs_list)
 
         return conversation
 
-    def _get_entries(self, conversation, senders_by_alias, attrs_list):
+    def _get_entries_and_images(self, conversation, senders_by_alias,
+                                attrs_list):
         aliases_by_sender = {v: k for k, v in iter(senders_by_alias.items())}
         entries = []
+        images = []
         for cons, attrs in attrs_list:
             if not attrs['sender']:
                 attrs['sender'] = senders_by_alias.get(attrs['alias'], '')
@@ -207,9 +210,12 @@ class PidginHtml(ChatlogFormat):
                 attrs['alias'] = ''
             if 'isuser' not in attrs:
                 attrs['isuser'] = attrs['sender'] == conversation.source
+
+            for h in (x for x in attrs['html'] if isinstance(x, Tag)):
+                images.extend([x.get('src') for x in h.find_all('img')])
             entries.append(cons(**attrs))
 
-        return entries
+        return entries, list(set(images))
 
     def _parse_info(self, info, conversation=None):
         info['service'] = self.SERVICE_MAP[info['service']]
@@ -377,6 +383,8 @@ class PidginHtml(ChatlogFormat):
         # newline at end
         fh.write('</body></html>\n')
         fh.close()
+
+        self.copy_images(path, conversation)
 
     def _write_entry(self, fh, entry, conversation, timefmt):
         timestr = entry.time.strftime(timefmt)
