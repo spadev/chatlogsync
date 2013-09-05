@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<chat xmlns="http://purl.org/net/ulf/ns/0.4-02" account="555" service="Facebook" adiumversion="1.5.7" buildid="c72b164f75a7">
+<event type="windowOpened" sender="555" time="2013-08-29T14:23:04-07:00"></event>
+<message sender="555" time="2013-08-29T14:23:04-07:00" alias="Source"><div>test</div></message>
+<message sender="555" time="2013-08-29T14:23:49-07:00" alias="Source"><div>nn</div></message>
+<event type="windowClosed" sender="555" time="2013-08-29T14:23:54-07:00"></event>
+<event type="windowOpened" sender="555" time="2013-08-29T14:30:49-07:00"></event>
+<message sender="555" time="2013-08-29T14:30:53-07:00" alias="Source"><div>send me amessage again</div></message>
+<message sender="-444@chat.facebook.com" time="2013-08-29T14:31:46-07:00" alias="Dest"><div><span style="font-family: Helvetica; font-size: 12pt;">test</span></div></message>
+<status type="disconnected" sender="555" time="2013-08-29T14:32:07-07:00" alias="Source"><div>You have disconnected</div></status>
+<event type="windowClosed" sender="555" time="2013-08-29T14:32:10-07:00"></event></chat>

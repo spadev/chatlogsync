@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!--chatlogsync-v0.1/pidgin-html--><chat xmlns="http://purl.org/net/ulf/ns/0.4-02" account="source@gmail.com" service="GTalk">
+<message sender="source@gmail.com" time="2011-12-09T01:13:43-08:00" alias="Source">regular message</message>
+<message sender="source@gmail.com" time="2011-12-09T01:13:45-08:00" alias="Source"><span>broken html</span></message>
+<message sender="dest@gmail.com" time="2011-12-09T01:24:01-08:00" alias="Dest"><div><span style="font-family: Helvetica; font-size: 12pt;">regular message</span></div></message>
+<message sender="source@gmail.com" time="2011-12-09T01:24:11-08:00" alias="Source"><div><span style="color: #000000; font-family: Helvetica; font-size: 12pt;">char&gt;message÷</span></div></message>
+<message sender="source@gmail.com" time="2011-12-09T01:24:18-08:00" alias="Source"><div><span style="color: #000000; font-family: Helvetica; font-size: 12pt;">multiline<br/>message<br/></span></div></message>
+<message sender="dest@gmail.com" time="2011-12-09T01:24:03-08:00" alias="Dest"><div><span style="font-family: Helvetica; font-size: 12pt;">delayed message dest</span></div></message>
+<message sender="source@gmail.com" time="2011-12-09T01:24:03-08:00" alias="Source"><div><span style="font-family: Helvetica; font-size: 12pt;">delayed message source</span></div></message>
+<!--|Dest has gone away.--><status type="away" sender="dest@gmail.com" time="2011-12-09T18:08:24-08:00" alias="Dest"></status>
+<!--|Dest is no longer away.--><status type="available" sender="dest@gmail.com" time="2011-12-09T18:09:24-08:00" alias="Dest"></status>
+<status type="purple" sender="dest@gmail.com" time="2011-12-09T18:12:00-08:00" alias="Dest">Dest signed off.</status>
+<status type="purple" sender="dest@gmail.com" time="2011-12-09T18:12:10-08:00" alias="Dest">Dest signed on.</status>
+<!--|Dest has gone away.--><status type="away" sender="dest@gmail.com" time="2011-12-09T18:13:00-08:00" alias="Dest"></status>
+<!--|Dest has become idle.--><status type="idle" sender="dest@gmail.com" time="2011-12-09T18:13:02-08:00" alias="Dest"></status>
+<!--|Dest is no longer idle.--><status type="available" sender="dest@gmail.com" time="2011-12-10T01:15:00-08:00" alias="Dest"></status>
+<!--|Dest is no longer away.--><status type="available" sender="dest@gmail.com" time="2011-12-10T01:15:03-08:00" alias="Dest"></status>
+<status type="chat-error" sender="dest@gmail.com" time="2011-12-10T01:16:00-08:00" alias="Dest">A message may not have been sent; a timeout occurred.</status>
+<message sender="dest@gmail.com" time="2011-12-10T01:16:05-08:00" auto="true" alias="Dest">this is an autoreply</message>
+<!--1|--><message sender="dest@gmail.com" time="2011-12-10T01:24:43-08:00" alias="Dest">alternate message</message>
+<status type="purple" sender="dest@gmail.com" time="2011-12-10T03:16:06-08:00" alias="Dest">system message</status>
+<status type="purple" sender="dest@gmail.com" time="2011-12-10T03:17:00-08:00" alias="Dest">Dest is mobile</status>
+<status type="purple" sender="dest@gmail.com" time="2011-12-10T03:17:03-08:00" alias="Dest">Dest is no longer mobile</status>
+<message sender="source@gmail.com" time="2011-12-11T01:13:43-08:00" alias="Source">3rd day message</message></chat>

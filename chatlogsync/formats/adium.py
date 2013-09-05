@@ -18,8 +18,6 @@ from chatlogsync.errors import ParseError
 from chatlogsync.conversation import Conversation, Message, Status, Event
 from chatlogsync.timezones import getoffset
 
-import sys
-
 class Adium(ChatlogFormat):
     type = 'adium'
     SERVICE_MAP = {'GTalk' : 'gtalk',
@@ -105,10 +103,16 @@ class Adium(ChatlogFormat):
                 service = self.SERVICE_MAP[e.get('service')]
                 source = e.get('account')
 
+        latest_time = conversation.time
         for line in lines:
             if line == "</chat>":
                 continue
             cons, attrs = self._parse_line(line, conversation)
+            if attrs['time'] < latest_time:
+                attrs['delayed'] = True
+            else:
+                latest_time = attrs['time']
+
             try:
                 conversation.entries.append(cons(**attrs))
             except Exception as err:
@@ -118,7 +122,6 @@ class Adium(ChatlogFormat):
         if source != conversation.source or service != conversation.service:
             raise ParseError("mismatch between path and chatinfo for '%s" %
                              conversation.path)
-
         return conversation
 
     def _parse_line(self, line, conversation):
@@ -129,6 +132,8 @@ class Adium(ChatlogFormat):
 
         for e in BeautifulSoup(line, ['lxml', 'xml']).children:
             if isinstance(e, Comment):
+                alternate, status_html = e.split('|', 1)
+                attrs['alternate'] = True if alternate else False
                 status_html = [NavigableString(e)]
                 continue
             for a in ('alias', 'sender', 'auto', 'time'):
@@ -140,8 +145,9 @@ class Adium(ChatlogFormat):
                 attrs['isuser'] = False
             else:
                 attrs['isuser'] = False
-                # if user is not source or destination, this is a group chat
-                conversation.isgroup = True
+                # if sender is not source or destination, this is a group chat
+                if attrs['sender']:
+                    conversation.isgroup = True
 
             attrs['auto'] = True if attrs['auto'] else False
             if attrs['time']:
@@ -215,13 +221,18 @@ class Adium(ChatlogFormat):
             v = v1+v2[:3]+':'+v2[3:]
             attrs['time'] = v
 
+            # comments should look like 1|status text
+            comment = ['1', ''] if entry.alternate else ['', '']
+
             if isinstance(entry, Status) and entry.type in Status.USER_TYPES:
                 htmlattr = 'msg_html'
                 if entry.has_other_html:
-                    util.write_comment(fh, ''.join([x.string for x
-                                                    in entry.html]))
+                    comment[1] = ''.join([x.string for x in entry.html])
             else:
                 htmlattr = 'html'
+
+            if [x for x in comment if x]:
+                util.write_comment(fh, '|'.join(comment))
 
             self._write_xml(fh, name, attrs, contents=getattr(entry, htmlattr))
             if i != len(conversation.entries)-1:

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!--chatlogsync-v0.1/pidgin-html--><chat xmlns="http://purl.org/net/ulf/ns/0.4-02" account="555" service="Facebook">
+<message sender="555" time="2013-08-29T14:23:04-07:00" alias="Source"><div>test</div></message>
+<message sender="555" time="2013-08-29T14:23:49-07:00" alias="Source"><div>nn</div></message>
+<message sender="555" time="2013-08-29T14:30:53-07:00" alias="Source"><div>send me amessage again</div></message>
+<message sender="-444@chat.facebook.com" time="2013-08-29T14:31:46-07:00" alias="Dest"><div><span style="font-family: Helvetica; font-size: 12pt;">test</span></div></message></chat>

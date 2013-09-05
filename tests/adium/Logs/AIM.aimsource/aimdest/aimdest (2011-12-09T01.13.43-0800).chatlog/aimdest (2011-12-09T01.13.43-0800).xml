@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<chat xmlns="http://purl.org/net/ulf/ns/0.4-02" account="aimsource" service="AIM">
+<event type="windowOpened" sender="aimsource" time="2011-12-09T01:13:43-08:00"></event>
+<message alias="Source" sender="aimsource" time="2011-12-09T01:13:43-08:00"><div><span style="color: #000000; font-family: Helvetica; font-size: 12pt;">regular message</span></div></message>
+<message alias="Dest" sender="aimdest" time="2011-12-09T01:24:01-08:00"><div><span style="font-family: Helvetica; font-size: 12pt;">regular message</span></div></message>
+<message alias="Source" sender="aimsource" time="2011-12-09T01:24:11-08:00"><div><span style="color: #000000; font-family: Helvetica; font-size: 12pt;">char&gt;message÷</span></div></message>
+<message alias="Source" sender="aimsource" time="2011-12-09T01:24:18-08:00"><div><span style="color: #000000; font-family: Helvetica; font-size: 12pt;">multiline<br/>message<br/></span></div></message>
+<message alias="Dest" sender="aimdest" time="2011-12-09T01:24:03-08:00"><div><span style="font-family: Helvetica; font-size: 12pt;">delayed message dest</span></div></message>
+<message alias="Source" sender="aimsource" time="2011-12-09T01:24:04-08:00"><div><span style="font-family: Helvetica; font-size: 12pt;">delayed message source</span></div></message>
+<status type="away" sender="aimdest" time="2011-12-09T18:08:24-08:00" alias="Dest"></status>
+<status type="online" sender="aimdest" time="2011-12-09T18:09:24-08:00" alias="Dest"></status>
+<status type="disconnected" sender="aimsource" time="2011-12-09T18:10:24-08:00" alias="Source"><div>You have disconnected</div></status>
+<status type="connected" time="2011-12-09T18:11:24-08:00"><div>You have connected</div></status>
+<status type="available" sender="aimdest" time="2011-12-09T18:12:00-08:00" alias="Dest"></status>
+<status type="away" sender="aimdest" time="2011-12-09T18:13:00-08:00" alias="Dest"><div><span style="font-family: Helvetica; font-size: 12pt;">I&apos;m not here right now&gt;</span></div></status>
+<status type="idle" sender="aimdest" time="2011-12-09T18:13:02-08:00" alias="Dest"></status>
+<status type="online" sender="aimdest" time="2011-12-10T01:15:00-08:00" alias="Dest"></status>
+<status type="available" sender="aimdest" time="2011-12-10T01:15:03-08:00" alias="Dest"></status>
+<status alias="Source" sender="aimsource" time="2011-12-10T01:16:00-08:00" type="chat-error"><div>A message may not have been sent; a timeout occurred.</div></status>
+<message alias="Dest" sender="aimdest" auto="true" time="2011-12-10T01:16:05-08:00"><div>this is an autoreply</div></message>
+<status type="purple" time="2011-12-10T01:16:06-08:00"><div>system message</div></status>
+<status type="mobile" sender="aimdest" time="2011-12-10T01:17:00-08:00" alias="Dest"></status>
+<status type="available" sender="aimdest" time="2011-12-10T01:17:03-08:00" alias="Dest"></status>
+<event type="windowClosed" sender="aimsource" time="2011-12-10T04:11:24-08:00"></event></chat>
