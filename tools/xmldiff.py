@@ -11,6 +11,11 @@ DESCRIPTION='Recursively diff XML files'
 
 def parse_args():
     parser = diff.get_argument_parser(PROG, DESCRIPTION)
+    parser.add_argument("-a", "--adium",
+                        help="normalize adium chat attributes",
+                        action='store_true',
+                        default=False,
+                        )
     options = parser.parse_args()
 
     return options
@@ -18,7 +23,8 @@ def parse_args():
 def xmldiff(options):
     n = 0
     for file1, file2 in diff.gather_files('*.xml'):
-        n  += diff.diff(file1, file2, ignore_comments=options.ignore_comments)
+        n  += diff.diff(file1, file2, ignore_comments=options.ignore_comments,
+                        adium=True)
 
     return n
 

@@ -14,6 +14,8 @@ class ChatlogFormat(object):
     PAMEPYT_TNEVE = {}
     FILE_PATTERN = ''
     TIME_FMT_FILE = ''
+    TRANSFORMS = {}
+    UNTRANSFORMS = {}
 
     def __init__(self):
         if not self.PAM_ECIVRES:
@@ -31,9 +33,9 @@ class ChatlogFormat(object):
             raise NotImplementedError
 
         return self.fill_pattern(conversation, self.FILE_PATTERN[1:],
-                                 self.TIME_FMT_FILE)
+                                 self.TIME_FMT_FILE, untransform=True)
 
-    def fill_pattern(self, conversation, pattern, time_fmt):
+    def fill_pattern(self, conversation, pattern, time_fmt, untransform=False):
         if (not self.SERVICE_MAP):
             raise NotImplementedError
 
@@ -42,8 +44,12 @@ class ChatlogFormat(object):
             item = s[i].split(' ', 1)
             attr = item[0]
             value = getattr(conversation, attr)
+            if untransform and attr in self.UNTRANSFORMS:
+                value = self.UNTRANSFORMS[attr](value, conversation)
+
             if len(item) == 2:
                 value = item[1] if value else ''
+
             if attr == 'service':
                 value = self.PAM_ECIVRES[value]
             elif isinstance(value, datetime.datetime):

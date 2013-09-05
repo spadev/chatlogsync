@@ -9,16 +9,16 @@
 <message sender="source@gmail.com" time="2011-12-09T01:24:03-08:00" alias="Source"><div><span style="font-family: Helvetica; font-size: 12pt;">delayed message source</span></div></message>
 <!--|Dest has gone away.--><status type="away" sender="dest@gmail.com" time="2011-12-09T18:08:24-08:00" alias="Dest"></status>
 <!--|Dest is no longer away.--><status type="available" sender="dest@gmail.com" time="2011-12-09T18:09:24-08:00" alias="Dest"></status>
-<status type="purple" sender="dest@gmail.com" time="2011-12-09T18:12:00-08:00" alias="Dest">Dest signed off.</status>
-<status type="purple" sender="dest@gmail.com" time="2011-12-09T18:12:10-08:00" alias="Dest">Dest signed on.</status>
+<!--|Dest has signed off.--><status type="offline" sender="dest@gmail.com" time="2011-12-09T18:12:00-08:00" alias="Dest"></status>
+<!--|Dest has signed on.--><status type="online" sender="dest@gmail.com" time="2011-12-09T18:12:10-08:00" alias="Dest"></status>
 <!--|Dest has gone away.--><status type="away" sender="dest@gmail.com" time="2011-12-09T18:13:00-08:00" alias="Dest"></status>
 <!--|Dest has become idle.--><status type="idle" sender="dest@gmail.com" time="2011-12-09T18:13:02-08:00" alias="Dest"></status>
-<!--|Dest is no longer idle.--><status type="available" sender="dest@gmail.com" time="2011-12-10T01:15:00-08:00" alias="Dest"></status>
+<!--|Dest is no longer idle.--><status type="online" sender="dest@gmail.com" time="2011-12-10T01:15:00-08:00" alias="Dest"></status>
 <!--|Dest is no longer away.--><status type="available" sender="dest@gmail.com" time="2011-12-10T01:15:03-08:00" alias="Dest"></status>
-<status type="chat-error" sender="dest@gmail.com" time="2011-12-10T01:16:00-08:00" alias="Dest">A message may not have been sent; a timeout occurred.</status>
+<status type="chat-error" sender="source@gmail.com" time="2011-12-10T01:16:00-08:00" alias="Source">A message may not have been sent; a timeout occurred.</status>
 <message sender="dest@gmail.com" time="2011-12-10T01:16:05-08:00" auto="true" alias="Dest">this is an autoreply</message>
 <!--1|--><message sender="dest@gmail.com" time="2011-12-10T01:24:43-08:00" alias="Dest">alternate message</message>
-<status type="purple" sender="dest@gmail.com" time="2011-12-10T03:16:06-08:00" alias="Dest">system message</status>
-<status type="purple" sender="dest@gmail.com" time="2011-12-10T03:17:00-08:00" alias="Dest">Dest is mobile</status>
-<status type="purple" sender="dest@gmail.com" time="2011-12-10T03:17:03-08:00" alias="Dest">Dest is no longer mobile</status>
+<status type="purple" time="2011-12-10T03:16:06-08:00" >system message</status>
+<!--|Dest is mobile.--><status type="mobile" sender="dest@gmail.com" time="2011-12-10T03:17:00-08:00" alias="Dest"></status>
+<!--|Dest is no longer mobile.--><status type="online" sender="dest@gmail.com" time="2011-12-10T03:17:03-08:00" alias="Dest"></status>
 <message sender="source@gmail.com" time="2011-12-11T01:13:43-08:00" alias="Source">3rd day message</message></chat>

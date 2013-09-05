@@ -60,6 +60,16 @@ class Adium(ChatlogFormat):
              'event': ('type', 'sender', 'time', 'alias'),
              }
 
+    # adium doesn't include the @chat.facebook.com for the source
+    TRANSFORMS = {'source':
+                      (lambda s, c: s+'@chat.facebook.com'
+                       if c.service == 'facebook' else s),
+                  }
+    UNTRANSFORMS = {'source':
+                        (lambda s, c: s.replace('@chat.facebook.com', '')
+                         if c.service == 'facebook' else s),
+                    }
+
     def _parse_ftime(self, timestr):
         ts1, ts2 = timestr[:-5], timestr[-5:]
         t = datetime.datetime.strptime(ts1, self.STRPTIME_FMT_FILE)
@@ -70,22 +80,25 @@ class Adium(ChatlogFormat):
         t = datetime.datetime.strptime(ts1, self.STRPTIME_FMT_CONVERSATION)
         return t.replace(tzinfo = getoffset(None, ts2))
 
+
     def parse_path(self, path):
         info = util.parse_string(path, self.FILE_PATTERN)
         if not info:
             return None
 
         time = self._parse_ftime(info['time'])
-        source = info['source']
         destination = info['destination']
         service = self.SERVICE_MAP[info['service']]
+        source = info['source']
 
         dp = dirname(path)
         images = [relpath(join(dp, x), start=dp) for x in os.listdir(dp)
                   if not x.endswith('.xml')]
 
+        # create conversation with tranformed source
         conversation = Conversation(self, path, source, destination,
-                                    service, time, entries=[], images=images)
+                                    service, time, entries=[], images=images,
+                                    transforms=self.TRANSFORMS)
 
         return [conversation]
 
@@ -102,12 +115,20 @@ class Adium(ChatlogFormat):
             else:
                 service = self.SERVICE_MAP[e.get('service')]
                 source = e.get('account')
+                transformed_source = \
+                    self.TRANSFORMS['source'](source, conversation)
+
+        if transformed_source != conversation.source or \
+                service != conversation.service:
+            raise ParseError("mismatch between path and chatinfo for '%s" %
+                             conversation.path)
 
         latest_time = conversation.time
         for line in lines:
             if line == "</chat>":
                 continue
-            cons, attrs = self._parse_line(line, conversation)
+            cons, attrs = self._parse_line(line, conversation, source,
+                                           transformed_source)
             if attrs['time'] < latest_time:
                 attrs['delayed'] = True
             else:
@@ -119,12 +140,9 @@ class Adium(ChatlogFormat):
                 print_e("Problem with element %s" % e)
                 raise err
 
-        if source != conversation.source or service != conversation.service:
-            raise ParseError("mismatch between path and chatinfo for '%s" %
-                             conversation.path)
         return conversation
 
-    def _parse_line(self, line, conversation):
+    def _parse_line(self, line, conversation, source, transformed_source):
         """Return (cons, attrs)"""
         status_html = []
         attrs = {}
@@ -139,7 +157,8 @@ class Adium(ChatlogFormat):
             for a in ('alias', 'sender', 'auto', 'time'):
                 attrs[a] = e.get(a, '')
 
-            if attrs['sender'] == conversation.source:
+            if attrs['sender'] == source:
+                attrs['sender'] = transformed_source
                 attrs['isuser'] = True
             elif attrs['sender'] == conversation.destination:
                 attrs['isuser'] = False
@@ -187,7 +206,9 @@ class Adium(ChatlogFormat):
 
         fh = codecs.open(path, 'wb', 'utf-8')
         fh.write(self.XML_HEADER+'\n')
-        attrs = dict(xmlns=self.XMLNS, account=conversation.source,
+        untransformed_source = self.UNTRANSFORMS['source'](conversation.source,
+                                                           conversation)
+        attrs = dict(xmlns=self.XMLNS, account=untransformed_source,
                      service=self.PAM_ECIVRES[conversation.service])
 
         util.write_comment(fh, const.HEADER_COMMENT %
@@ -196,7 +217,11 @@ class Adium(ChatlogFormat):
         fh.write('\n')
 
         for i, entry in enumerate(conversation.entries):
-            attrs = dict(alias=entry.alias, sender=entry.sender)
+            attrs = {'alias': entry.alias,
+                     'sender': (untransformed_source
+                                if entry.sender == conversation.source
+                                else entry.sender)
+                     }
             if isinstance(entry, Message):
                 name = 'message'
                 if entry.auto:

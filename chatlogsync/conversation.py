@@ -54,8 +54,8 @@ def _get_text(html):
 
 class Conversation(object):
     """Object representing a conversation from a chatlog"""
-    def __init__(self, parsedby, path, source, destination,
-                 service, time, entries, images, isgroup=False):
+    def __init__(self, parsedby, path, source, destination, service, time,
+                 entries, images, isgroup=False, transforms={}):
         self._source = source
         self._destination = destination
         self._service = service
@@ -73,6 +73,10 @@ class Conversation(object):
         self.__validate_images(images)
         self.entries = entries
 
+        for attr, function in iter(transforms.items()):
+            cur_value = getattr(self, '_'+attr)
+            new_value = function(cur_value, self)
+            setattr(self, '_'+attr, new_value)
 
     @property
     def original_parser_name(self):
@@ -331,6 +335,16 @@ class Status(Entry):
     SYSTEM = 9
     MOBILE = 10
 
+    SYSTEM_STATUSES = (SYSTEM,)
+    OPPOSITES = { OFFLINE: ONLINE,
+                  ONLINE: (OFFLINE, IDLE, MOBILE),
+                  AVAILABLE: AWAY,
+                  AWAY: AVAILABLE,
+                  IDLE: ONLINE,
+                  DISCONNECTED: CONNECTED,
+                  CONNECTED: DISCONNECTED,
+                  MOBILE: ONLINE }
+
     _MIN = 1
     _MAX = 10
 
@@ -347,6 +361,9 @@ class Status(Entry):
         MOBILE: _("Mobile"),
         }
 
+    PAM_EPYT = dict({v: k for k, v in iter(TYPE_MAP.items())},
+                    **{v.lower(): k for k, v in iter(TYPE_MAP.items())})
+
     USER_TYPES = (OFFLINE, ONLINE, AVAILABLE, AWAY, IDLE, MOBILE)
     CHANGED_STATUS_TO = _("changed status to")
     STATUS_STRING_FMT = "%s "+CHANGED_STATUS_TO+" %s%s"
@@ -360,6 +377,9 @@ class Status(Entry):
         self._type = atype
         if self._msg_text and not self._msg_html:
             self._msg_html = [NavigableString(self._msg_text)]
+
+        if self._type in self.SYSTEM_STATUSES:
+            kwargs['system'] = True
 
         super(Status, self).__init__(**kwargs)
         self._has_other_html = True if self._html else False

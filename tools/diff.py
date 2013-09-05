@@ -12,7 +12,6 @@ from argparse import ArgumentParser, ArgumentTypeError
 from bs4 import BeautifulSoup
 from bs4.element import Comment
 
-
 DIVIDER = "\n"+"-"*80+'\n'
 def isdirectory(value):
     if not isdir(value):
@@ -46,17 +45,24 @@ def gather_files(pattern):
 
     return paths
 
-def ignore_comments(soup):
+def strip_comments(soup):
     comments = soup.find_all(text=lambda text:isinstance(text, Comment))
     [comment.extract() for comment in comments]
 
     return soup
 
-def normalize_pidgin_html(soup):
+def normalize_pidgin(soup):
     for name in ('h3', 'title'):
         tag = soup.find(name)
         text = re.sub('/.* ', ' ', tag.text)
         list(tag.children)[0].replaceWith(text)
+
+    return soup
+
+def normalize_adium(soup):
+    chat = soup.chat
+    del chat['buildid']
+    del chat['adiumversion']
 
     return soup
 
@@ -74,7 +80,7 @@ def get_argument_parser(prog, description):
                         )
     return parser
 
-def diff(file1, file2, ignore_comments=False, pidgin=False):
+def diff(file1, file2, ignore_comments=False, pidgin=False, adium=False):
     n = 0
     if not file2:
         print("%s only exists in source directory" % file1)
@@ -87,11 +93,14 @@ def diff(file1, file2, ignore_comments=False, pidgin=False):
         soup2 = BeautifulSoup(f)
 
     if ignore_comments:
-        soup1 = ignore_comments(soup1)
-        soup2 = ignore_comments(soup2)
+        soup1 = strip_comments(soup1)
+        soup2 = strip_comments(soup2)
     if pidgin:
-        soup1 = normalize_pidgin_html(soup1)
-        soup2 = normalize_pidgin_html(soup2)
+        soup1 = normalize_pidgin(soup1)
+        soup2 = normalize_pidgin(soup2)
+    if adium:
+        soup1 = normalize_adium(soup1)
+        soup2 = normalize_adium(soup2)
 
     html1 = soup1.prettify().split('\n')
     html2 = soup2.prettify().split('\n')

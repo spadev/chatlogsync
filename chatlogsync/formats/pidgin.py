@@ -177,7 +177,7 @@ class PidginHtml(ChatlogFormat):
             if s and a and a not in ignore_aliases:
                 s2 = senders_by_alias.get(a, s)
                 if s != s2:
-                    print_w('Multiple senders found for %s (%s)'
+                    print_d('Multiple senders found for %s (%s)'
                             % (a, '%s, %s' % (s, s2)))
                     ignore_aliases.add(a)
                     del senders_by_alias[a]
@@ -195,10 +195,12 @@ class PidginHtml(ChatlogFormat):
         entries = []
         for cons, attrs in attrs_list:
             if not attrs['sender']:
-                attrs['sender'] = senders_by_alias.get(attrs['alias'], None)
+                attrs['sender'] = senders_by_alias.get(attrs['alias'], '')
                 if not attrs['sender']:
-                    # default to destination if no sender
-                    attrs['sender'] = conversation.destination
+                    print_d('Unable to determine sender for attrs %r' % attrs)
+                    # default to source
+                    attrs['sender'] = conversation.source
+
             if not attrs['alias']:
                 attrs['alias'] = aliases_by_sender.get(attrs['sender'], '')
             if attrs['sender'] == attrs['alias']:
@@ -332,7 +334,14 @@ class PidginHtml(ChatlogFormat):
                 if i is not None:
                     for k, v in iter(i.items()):
                         info[k] = v
-                    info['type'] = t
+                    # special case for 'is no longer <type>'
+                    typestr = i.get('type')
+                    if typestr:
+                        info['type'] = \
+                            Status.OPPOSITES[Status.PAM_EPYT[typestr]]
+                    else:
+                        info['type'] = t
+                    break
 
     def _parse_title(self, line, comment, conversation):
         m = self.TITLE_LINE_RE.match(line)

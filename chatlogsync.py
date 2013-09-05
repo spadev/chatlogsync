@@ -210,6 +210,11 @@ def parse_args():
                         action='store_true',
                         default=False,
                         )
+    parser.add_argument("--no-comments",
+                        help=_("do not write comments to converted logs"),
+                        action='store_true',
+                        default=False,
+                        )
     parser.add_argument("-q", "--quiet",
                         help=_("suppress warnings"),
                         action='store_true',
@@ -235,6 +240,8 @@ def parse_args():
         const.QUIET = True
     if options.dry_run:
         const.DRYRUN = True
+    if options.no_comments:
+        const.NO_COMMENTS = True
 
     return options
 
