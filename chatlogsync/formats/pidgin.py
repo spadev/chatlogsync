@@ -220,7 +220,10 @@ class PidginHtml(ChatlogFormat):
                 attrs['isuser'] = attrs['sender'] == conversation.source
 
             for h in (x for x in attrs['html'] if isinstance(x, Tag)):
-                images.extend([x.get('src') for x in h.find_all('img')])
+                if h.name == 'img':
+                    images.append(h.get('src'))
+                else:
+                    images.extend([x.get('src') for x in h.find_all('img')])
             entries.append(cons(**attrs))
 
         return entries, list(set(images))
