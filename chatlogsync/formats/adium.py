@@ -72,6 +72,7 @@ class Adium(ChatlogFormat):
                     }
 
     SENDER_RE = re.compile('<[^<>]*sender="(?P<sender>.*?)".*?>')
+    IMGTAG_RE = re.compile('<img (.*?)([/]?)>(.*)')
 
     def _parse_ftime(self, timestr):
         ts1, ts2 = timestr[:-5], timestr[-5:]
@@ -302,7 +303,7 @@ class Adium(ChatlogFormat):
         for e in contents:
             if isinstance(e, Tag):
                 # must include size of the image to display properly in adium
-                # log viewer
+                # log viewer. width and height attributes must come before src.
                 if e.name == 'img':
                     src = e.get('src')
                     if src in conversation.images and \
@@ -310,7 +311,15 @@ class Adium(ChatlogFormat):
                         idx = conversation.images.index(src)
                         fullpath = conversation.images_full[idx][1]
                         e['width'], e['height'] = util.get_image_size(fullpath)
-                fh.write(e.decode())
+                    m = self.IMGTAG_RE.match(e.decode())
+                    attributes, close, rest = m.groups()
+                    attributes = attributes.split()
+                    attributes.sort(key=lambda x: 'b' if x.startswith('width') or
+                                    x.startswith('height') else x)
+                    fh.write('<img %s%s>%s' %
+                             (' '.join(attributes), close, rest))
+                else:
+                    fh.write(e.decode())
             else:
                 fh.write(e.output_ready())
 
