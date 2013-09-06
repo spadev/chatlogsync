@@ -1,4 +1,5 @@
 from __future__ import print_function
+from __future__ import unicode_literals
 
 import codecs
 import fnmatch
@@ -46,6 +47,13 @@ def strip_comments(soup):
 
     return soup
 
+def strip_first_comment(soup):
+    first_comment = soup.find(text=lambda text:isinstance(text, Comment))
+    if first_comment:
+        first_comment.extract()
+
+    return soup
+
 def normalize_pidgin(soup):
     for name in ('h3', 'title'):
         tag = soup.find(name)
@@ -73,6 +81,11 @@ def get_argument_parser(prog, description):
                         action='store_true',
                         default=False,
                         )
+    parser.add_argument("-s", "--strip-first-comment",
+                        help="do not consider first comment",
+                        action='store_true',
+                        default=False,
+                        )
     return parser
 
 def check_images(soup, path, lines):
@@ -86,15 +99,20 @@ def check_images(soup, path, lines):
 
     return n
 
-def diff(file1, file2, dir1, dir2,
-         ignore_comments=False, pidgin=False, adium=False, images=True):
-    n = 0
+def print_(*args, **kwargs):
+    file = kwargs['file'] = kwargs.get('file', sys.stdout)
+    flush = kwargs.pop('flush', True)
+    print(*args, **kwargs)
+    if flush:
+        file.flush()
 
+def diff(file1, file2, options, images=True):
+    n = 0
     if not file2:
-        cp = commonprefix([dir1, dir2])
+        cp = commonprefix([options.source, options.destination])
         path = file1.replace(cp, '')
-        print("%s only exists in %s" % (path, dir1))
-        print(DIVIDER)
+        print_("%s only exists in %s" % (path, options.source))
+        print_(DIVIDER)
         return 1
 
     with codecs.open(file1, encoding='utf-8') as f:
@@ -102,13 +120,16 @@ def diff(file1, file2, dir1, dir2,
     with codecs.open(file2, encoding='utf-8') as f:
         soup2 = BeautifulSoup(f)
 
-    if ignore_comments:
+    if options.strip_first_comment:
+        soup1 = strip_first_comment(soup1)
+        soup2 = strip_first_comment(soup2)
+    if options.ignore_comments:
         soup1 = strip_comments(soup1)
         soup2 = strip_comments(soup2)
-    if pidgin:
+    if 'pidgin' in options and options.pidgin:
         soup1 = normalize_pidgin(soup1)
         soup2 = normalize_pidgin(soup2)
-    if adium:
+    if 'adium' in options and options.adium:
         soup1 = normalize_adium(soup1)
         soup2 = normalize_adium(soup2)
 
@@ -127,6 +148,9 @@ def diff(file1, file2, dir1, dir2,
     if n:
         lines.append(DIVIDER)
         n = 1
-        print('\n'.join(lines))
+        s = '\n'.join(lines)
+        if not isinstance(s, str):
+            s = s.encode('utf-8')
+        print_(s)
 
     return n

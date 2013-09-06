@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <!--chatlogsync-v0.1/pidgin-html--><chat xmlns="http://purl.org/net/ulf/ns/0.4-02" account="source@gmail.com" service="GTalk" resource="Pidgin">
 <message sender="source@gmail.com" time="2011-12-09T01:13:43-08:00" alias="Source">regular message</message>
-<message sender="source@gmail.com" time="2011-12-09T01:13:45-08:00" alias="Source"><span>broken html</span></message>
 <message sender="dest@gmail.com" time="2011-12-09T01:24:01-08:00" alias="Dest"><div><span style="font-family: Helvetica; font-size: 12pt;">regular message</span></div></message>
 <message sender="source@gmail.com" time="2011-12-09T01:24:11-08:00" alias="Source"><div><span style="color: #000000; font-family: Helvetica; font-size: 12pt;">char&gt;message÷</span></div></message>
 <message sender="source@gmail.com" time="2011-12-09T01:24:18-08:00" alias="Source"><div><span style="color: #000000; font-family: Helvetica; font-size: 12pt;">multiline<br/>message<br/></span></div></message>

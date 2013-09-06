@@ -24,9 +24,7 @@ def xmldiff(options):
     n = 0
     for file1, file2 in diff.gather_files('*.xml', options.source,
                                           options.destination):
-        n  += diff.diff(file1, file2, options.source, options.destination,
-                        ignore_comments=options.ignore_comments,
-                        adium=options.adium)
+        n  += diff.diff(file1, file2, options)
 
     return n
 

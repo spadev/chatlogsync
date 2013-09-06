@@ -129,6 +129,7 @@ class Adium(ChatlogFormat):
             else:
                 service = self.SERVICE_MAP[e.get('service')]
                 source = e.get('account')
+                conversation.resource = e.get('resource')
                 transformed_source = \
                     self.TRANSFORMS['source'](source, conversation)
 
@@ -166,7 +167,7 @@ class Adium(ChatlogFormat):
             if isinstance(e, Comment):
                 alternate, status_html = e.split('|', 1)
                 attrs['alternate'] = True if alternate else False
-                status_html = [NavigableString(e)]
+                status_html = [NavigableString(status_html)]
                 continue
             for a in ('alias', 'sender', 'auto', 'time'):
                 attrs[a] = e.get(a, '')
@@ -242,6 +243,8 @@ class Adium(ChatlogFormat):
             elif isinstance(entry, Event):
                 name = 'event'
                 attrs['type'] = self.PAMEPYT_TNEVE[entry.type]
+                # no alias for event
+                attrs['alias'] = ''
 
             if entry.system: # no alias or sender for these
                 del attrs['alias']

@@ -41,7 +41,7 @@ class PidginHtml(ChatlogFormat):
     ERROR_COLOR = "#FF0000"
     ALTERNATE_COLOR = "#062585"
 
-    AUTOREPLY_HTML = '&lt;AUTO-REPLY&gt;'
+    AUTOREPLY_HTML = ' &lt;AUTO-REPLY&gt;'
 
     MESSAGE_LINE_FMT = ('<font color="%s"><font size="2">%s</font>'
                         ' <b>%s%s:</b></font> ')
@@ -93,7 +93,7 @@ class PidginHtml(ChatlogFormat):
                            }
 
     UNTRANSFORMS = {'source':
-                        (lambda s, c: s+'/'+c.resource if c.resource
+                        (lambda s, c: (s+'/'+c.resource) if c.resource
                          else s)
                     }
 
@@ -341,9 +341,10 @@ class PidginHtml(ChatlogFormat):
             info['type'] = int(info['type'])
             if info['type'] in Status.USER_TYPES:
                 l = info['html'][0].split(': ', 1)
-                if len(l) > 1:
-                    info['msg_html'] = l[1]
-                del info['html']
+                if len(l) == 2:
+                    info['msg_html'] = [NavigableString(l[1])]+info['html'][1:]
+
+                info['html'] = []
             return
 
         s = ''.join([x.text if isinstance(x, Tag) else x.string
@@ -419,7 +420,10 @@ class PidginHtml(ChatlogFormat):
             timestr = entry.time.strftime(timefmt)
 
             # write real sender in groupchat Message
-            if conversation.isgroup and entry.alias:
+            # if sender is ambiguous (not source)
+            if conversation.isgroup and entry.alias \
+                    and entry.alias != entry.sender and \
+                    entry.sender != conversation.source:
                 util.write_comment(fh, entry.sender)
 
             fh.write(self.MESSAGE_LINE_FMT % (color, timestr, name, autoreply))

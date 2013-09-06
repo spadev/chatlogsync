@@ -4,7 +4,7 @@ from os.path import join, dirname
 import testing
 
 NAME = 'adium'
-EXTENSION = 'html'
+EXTENSION = 'xml'
 SOURCE_DIR = join(dirname(__file__), NAME)
 TO_TEST = (('pidgin-html', 'html'),)
 
