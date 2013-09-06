@@ -55,7 +55,7 @@ class Adium(ChatlogFormat):
     XMLNS = "http://purl.org/net/ulf/ns/0.4-02"
     XML_HEADER = '<?xml version="1.0" encoding="UTF-8" ?>'
 
-    ATTRS = {'chat': ('xmlns', 'account', 'service', 'resource'),
+    ATTRS = {'chat': ('xmlns', 'account', 'service', 'resource', 'groupchat'),
              'message': ('sender', 'time', 'auto', 'alias'),
              'status': ('type', 'sender', 'time', 'alias'),
              'event': ('type', 'sender', 'time', 'alias'),
@@ -83,8 +83,10 @@ class Adium(ChatlogFormat):
         t = datetime.datetime.strptime(ts1, self.STRPTIME_FMT_CONVERSATION)
         return t.replace(tzinfo=getoffset(None, ts2))
 
-    def _is_group(self, lines, path, source, destination):
+    def _isgroup(self, lines, path, source, destination):
         senders = set((source, destination, None))
+        if 'groupchat="true"' in lines[1]:
+            return True
         for line in lines:
             m = self.SENDER_RE.search(line)
             if m and m.group('sender') not in senders:
@@ -104,7 +106,7 @@ class Adium(ChatlogFormat):
         with codecs.open(path, encoding='utf-8') as f:
             data = f.read().strip()
             lines = data.split('\n')
-        isgroup = self._is_group(lines, path, source, destination)
+        isgroup = self._isgroup(lines, path, source, destination)
 
         dp = join(dirname(path), self.IMAGE_DIRECTORY)
         images = [relpath(join(dp, x), start=dp) for x in os.listdir(dp)
@@ -221,6 +223,11 @@ class Adium(ChatlogFormat):
         attrs = dict(xmlns=self.XMLNS, account=untransformed_source,
                      service=self.PAM_ECIVRES[conversation.service],
                      resource=conversation.resource)
+
+        # this attribute will only be useful if we're not the original parser
+        if conversation.isgroup and \
+                conversation.original_parser_name != self.type:
+            attrs['groupchat'] = "true"
 
         util.write_comment(fh, const.HEADER_COMMENT %
                            conversation.original_parser_name)

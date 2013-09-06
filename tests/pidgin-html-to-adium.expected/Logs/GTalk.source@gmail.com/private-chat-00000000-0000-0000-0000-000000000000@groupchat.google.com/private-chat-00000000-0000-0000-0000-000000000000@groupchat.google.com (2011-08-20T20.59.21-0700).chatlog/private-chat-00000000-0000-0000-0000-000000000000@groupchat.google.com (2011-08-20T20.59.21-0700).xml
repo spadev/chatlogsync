@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<!--chatlogsync-v0.1/pidgin-html--><chat xmlns="http://purl.org/net/ulf/ns/0.4-02" account="source@gmail.com" service="GTalk">
+<!--chatlogsync-v0.1/pidgin-html--><chat xmlns="http://purl.org/net/ulf/ns/0.4-02" account="source@gmail.com" service="GTalk" groupchat="true">
 <status type="purple" time="2011-08-20T20:59:21-07:00">A_gmail.com entered the room.</status>
 <status type="purple" time="2011-08-20T20:59:21-07:00">B_gmail.com entered the room.</status>
 <message sender="A_gmail.com" time="2011-08-20T20:59:25-07:00">test</message>
