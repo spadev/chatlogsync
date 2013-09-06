@@ -55,8 +55,9 @@ def _get_text(html):
 class Conversation(object):
     """Object representing a conversation from a chatlog"""
     def __init__(self, parsedby, path, source, destination, service, time,
-                 entries, images, isgroup=False, transforms={}):
+                 entries, images, resource='', isgroup=False, transforms={}):
         self._source = source
+        self._resource = resource
         self._destination = destination
         self._service = service
         self._path = path
@@ -84,6 +85,13 @@ class Conversation(object):
     @original_parser_name.setter
     def original_parser_name(self, name):
         self._original_parser_name = name
+
+    @property
+    def resource(self):
+        return self._resource
+    @resource.setter
+    def resource(self, resource):
+        self._resource = resource
 
     @property
     def isgroup(self):
@@ -175,7 +183,7 @@ class Conversation(object):
 
     def __hash__(self):
         h = hash(self.source)
-        for k in ('destination', 'service', 'time'):
+        for k in ('destination', 'service', 'time', 'isgroup'):
             h = h^hash(getattr(self, k))
         for k in ('images', 'entries'):
             h = h^hash(tuple(getattr(self, k)))
@@ -183,7 +191,7 @@ class Conversation(object):
         return h
 
     def __eq__(self, other):
-        for k in ('source', 'destination', 'service', 'time',
+        for k in ('source', 'destination', 'service', 'time', 'isgroup',
                   'images', 'entries'):
             if getattr(self, k) != getattr(other, k):
                 return False

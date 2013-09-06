@@ -61,7 +61,7 @@ class ChatlogFormat(object):
                 value = self.UNTRANSFORMS[attr](value, conversation)
 
             if len(item) == 2:
-                value = item[1] if value else ''
+                value = item[1].replace(attr, str(value)) if value else ''
 
             if attr == 'service':
                 value = self.PAM_ECIVRES[value]

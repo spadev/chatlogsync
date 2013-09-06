@@ -74,7 +74,8 @@ class PidginHtml(ChatlogFormat):
 
     COMMENT_RE = re.compile('^%s(?P<commentstr>.*?)%s' % (Comment.PREFIX,
                                                           Comment.SUFFIX))
-    SOURCE_RE = re.compile('/[^/]*$')
+
+    PATH_TIME_RE = re.compile('(.*)([+-]\d{4})(.*)')
 
     TIME_FMT_CONVERSATION = "(%X)"
     TIME_FMT_CONVERSATION_WITH_DATE = "(%x %X)"
@@ -90,6 +91,11 @@ class PidginHtml(ChatlogFormat):
     CHAT_STATUS_TYPEMAP = {_("{alias} entered the room."): Status.SYSTEM,
                            _("{alias} left the room."): Status.SYSTEM,
                            }
+
+    UNTRANSFORMS = {'source':
+                        (lambda s, c: s+'/'+c.resource if c.resource
+                         else s)
+                    }
 
     def __init__(self, *args):
         super(PidginHtml, self).__init__(*args)
@@ -108,7 +114,8 @@ class PidginHtml(ChatlogFormat):
         conversation = Conversation(self, path, info['source'],
                                     info['destination'],
                                     info['service'], info['time'],
-                                    [], [], info['isgroup'])
+                                    [], [], resource=info['resource'],
+                                    isgroup=info['isgroup'])
 
         return [conversation]
 
@@ -137,6 +144,9 @@ class PidginHtml(ChatlogFormat):
             self._parse_title(title_line, comment, conversation)
 
         for k, v in iter(info.items()):
+            # no way to determine resource without reading file first
+            if k == 'resource':
+                conversation.resource = v
             cv = getattr(conversation, k)
             if v != cv:
                 raise ParseError("mismatch between filename and header "
@@ -216,8 +226,12 @@ class PidginHtml(ChatlogFormat):
         return entries, list(set(images))
 
     def _parse_info(self, info, conversation=None):
+        s = info.get('source', '').rsplit('/', 1)
+        if len(s) == 1:
+            s.append('')
+        info['source'], info['resource'] = s
+
         info['service'] = self.SERVICE_MAP[info['service']]
-        info['source'] = self.SOURCE_RE.sub('', info['source'])
         if info['service'] == 'jabber':
             if info['destination'].endswith('@gmail.com') or \
                     info['source'].endswith('@gmail.com'):
@@ -228,10 +242,10 @@ class PidginHtml(ChatlogFormat):
 
 
         if not conversation: # parsing a path
-            pos = info['time'].rfind('-')
-            ts1, ts2 = info['time'][:pos], info['time'][pos:]
-            t = datetime.datetime.strptime(ts1, self.STRPTIME_FMT_FILE)
-            info['time'] = t.replace(tzinfo=getoffset(ts2[5:], ts2[:5]))
+            timestr, offset, abbrev = \
+                self.PATH_TIME_RE.match(info['time']).groups()
+            t = datetime.datetime.strptime(timestr, self.STRPTIME_FMT_FILE)
+            info['time'] = t.replace(tzinfo=getoffset(abbrev, offset))
         else:
             info['time'] = parse(info['time'], tzinfos=getoffset)
             if not info['time'].tzname():
@@ -372,7 +386,7 @@ class PidginHtml(ChatlogFormat):
 
         conversation = conversations[0]
         titlestr = self.fill_pattern(conversation, self.TITLE_PATTERN,
-                                     self.TIME_FMT_TITLE)
+                                     self.TIME_FMT_TITLE, untransform=True)
         titlestr = NavigableString(titlestr).output_ready()
         fh = codecs.open(path, 'wb', 'utf-8')
         util.write_comment(fh, const.HEADER_COMMENT %

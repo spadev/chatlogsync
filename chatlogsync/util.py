@@ -22,8 +22,11 @@ def parse_string(string, pattern):
     for i in range(1, len(s), 2):
         item = s[i].split(' ', 1)
         key = item[0]
-        fmt = "(?P<%s%i>.*?)" if len(item) == 1 else \
-            "(?P<%s%i>{})?".format(item[1])
+        if len(item) == 1:
+            fmt = "(?P<%s%i>.*?)"
+        else:
+            escaped_item = re.escape(item[1])
+            fmt = "(?P<%s%i>{})?".format(escaped_item)
 
         if key not in counts:
             counts[key] = 0

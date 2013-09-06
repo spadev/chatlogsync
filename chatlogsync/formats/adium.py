@@ -55,7 +55,7 @@ class Adium(ChatlogFormat):
     XMLNS = "http://purl.org/net/ulf/ns/0.4-02"
     XML_HEADER = '<?xml version="1.0" encoding="UTF-8" ?>'
 
-    ATTRS = {'chat': ('xmlns', 'account', 'service'),
+    ATTRS = {'chat': ('xmlns', 'account', 'service', 'resource'),
              'message': ('sender', 'time', 'auto', 'alias'),
              'status': ('type', 'sender', 'time', 'alias'),
              'event': ('type', 'sender', 'time', 'alias'),
@@ -218,7 +218,8 @@ class Adium(ChatlogFormat):
         untransformed_source = self.UNTRANSFORMS['source'](conversation.source,
                                                            conversation)
         attrs = dict(xmlns=self.XMLNS, account=untransformed_source,
-                     service=self.PAM_ECIVRES[conversation.service])
+                     service=self.PAM_ECIVRES[conversation.service],
+                     resource=conversation.resource)
 
         util.write_comment(fh, const.HEADER_COMMENT %
                            conversation.original_parser_name)
