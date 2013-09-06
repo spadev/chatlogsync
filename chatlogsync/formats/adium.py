@@ -231,7 +231,7 @@ class Adium(ChatlogFormat):
 
         util.write_comment(fh, const.HEADER_COMMENT %
                            conversation.original_parser_name)
-        self._write_xml(fh, 'chat', attrs, close=False)
+        self._write_xml(fh, 'chat', attrs, conversation,close=False)
         fh.write('\n')
 
         for i, entry in enumerate(conversation.entries):
@@ -279,7 +279,8 @@ class Adium(ChatlogFormat):
             if [x for x in comment if x]:
                 util.write_comment(fh, '|'.join(comment))
 
-            self._write_xml(fh, name, attrs, contents=getattr(entry, htmlattr))
+            self._write_xml(fh, name, attrs, conversation,
+                            contents=getattr(entry, htmlattr))
             if i != len(conversation.entries)-1:
                 fh.write('\n')
 
@@ -288,7 +289,8 @@ class Adium(ChatlogFormat):
 
         self.copy_images(path, conversation)
 
-    def _write_xml(self, fh, name, attrs, contents=[], close=True):
+    def _write_xml(self, fh, name, attrs, conversation,
+                   contents=[], close=True):
         attrlist = []
         for n in self.ATTRS[name]:
             v = attrs.get(n, None)
@@ -299,6 +301,15 @@ class Adium(ChatlogFormat):
 
         for e in contents:
             if isinstance(e, Tag):
+                # must include size of the image to display properly in adium
+                # log viewer
+                if e.name == 'img':
+                    src = e.get('src')
+                    if src in conversation.images and \
+                            not e.has_attr('width') or not e.has_attr('height'):
+                        idx = conversation.images.index(src)
+                        fullpath = conversation.images_full[idx][1]
+                        e['width'], e['height'] = util.get_image_size(fullpath)
                 fh.write(e.decode())
             else:
                 fh.write(e.output_ready())

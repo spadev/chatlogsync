@@ -5,10 +5,18 @@ import os
 import re
 import datetime
 from os.path import join, isfile
+
 from bs4.element import Comment
+from PIL import Image
 
 from chatlogsync import const
 from chatlogsync.errors import ParseError
+
+def get_image_size(fullpath):
+    """Return (width, height)"""
+    with open(fullpath, 'rb') as fp:
+        im = Image.open(fp)
+    return im.size
 
 def write_comment(fh, comment_text):
     if not const.NO_COMMENTS:
