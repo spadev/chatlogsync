@@ -13,6 +13,10 @@ from os.path import join, dirname, exists
 
 from dateutil.parser import parse
 
+from chatlogsync import timezones
+from chatlogsync.timezones import getoffset
+from chatlogsync.formats import pidgin
+
 CHATLOGSYNC = join(dirname(__file__), "..", 'chatlogsync.py')
 HTMLDIFF = join(dirname(__file__), "..", 'tools', 'htmldiff.py')
 XMLDIFF = join(dirname(__file__), "..", 'tools', 'xmldiff.py')
@@ -27,12 +31,25 @@ def print_(*args, **kwargs):
         file.flush()
 
 def convert_pidgin_times(path, revert=False):
+    parser = pidgin.PidginHtml()
+
     shortfmt = "%H:%M:%S" if revert else "%X"
     longfmt = "%Y-%m-%d %H:%M:%S" if revert else "%x %X"
+    title_fmt = "%a %d %b %Y %H:%M:%S %Z" if revert else "%c"
+
     with open(path) as fh:
         lines = fh.read().strip().split('\n')
 
     newlines = []
+
+    conversation_time = parser.parse_path(path)[0].time
+    pat = '(.*<title>.*? at )(.*?)( on .*<h3>.* at )(.*?)( on .*)'
+    m = re.search(pat, lines.pop(0))
+    before, timestr1, middle, timestr2, after = m.groups()
+    parsed_dt = parse(timestr1, default=conversation_time)
+    new_timestr = parsed_dt.strftime(title_fmt)
+    newlines.append("%s%s%s%s%s" % (before, new_timestr, middle,
+                                    new_timestr, after))
     for line in lines:
         m = re.search('(.*?<font size="2">\()(.*?)(\)</font>.*)', line)
         if m:
@@ -125,6 +142,7 @@ def apply_function(directory, ext, func, kwargs={}):
 
 def test_all(source_dir, source_ext, source_format, dest_ef_pairs):
     locale.setlocale(locale.LC_ALL, '')
+    timezones.init()
     n = 0
     for dest_ext, dest_format in dest_ef_pairs:
         n += test_one(source_dir, source_ext, source_format,

@@ -6,9 +6,9 @@ import traceback
 from os.path import join, dirname, isdir
 from collections import defaultdict
 
-import testing
+from tests import testing
 
-BASE_DIR = dirname(__file__)
+BASE_DIR = join(dirname(__file__), 'tests')
 
 def get_extension(directory):
     extensions = defaultdict(int)
