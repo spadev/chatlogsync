@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 
 import os
 import sys
@@ -15,6 +15,8 @@ def get_extension(directory):
     for root, dirs, files in os.walk(directory):
         for file in files:
             extension = os.path.splitext(file)[1]
+            if extension == '.tmp':
+                os.unlink(join(root, file))
             if extension:
                 extensions[extension] += 1
     return max(extensions.items(), key=lambda x: x[1])[0][1:]
