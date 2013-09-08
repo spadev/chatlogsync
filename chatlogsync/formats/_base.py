@@ -45,7 +45,7 @@ class ChatlogFormat(object):
         if not self.FILE_PATTERN:
             raise NotImplementedError
 
-        return self.fill_pattern(conversation, self.FILE_PATTERN[1:],
+        return self.fill_pattern(conversation, self.FILE_PATTERN,
                                  self.TIME_FMT_FILE, untransform=True)
 
     def fill_pattern(self, conversation, pattern, time_fmt, untransform=False):

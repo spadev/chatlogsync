@@ -29,10 +29,9 @@ def htmldiff(options):
     return n
 
 if __name__ == "__main__":
-    options = None
+    options = parse_args()
+    exitcode = 0
     try:
-        exitcode = 0
-        options = parse_args()
         exitcode = htmldiff(options)
     except KeyboardInterrupt:
         exitcode = 1

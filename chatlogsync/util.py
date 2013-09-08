@@ -4,7 +4,7 @@ from __future__ import absolute_import
 import os
 import re
 import datetime
-from os.path import join, isfile
+from os.path import join, isfile, sep
 
 from bs4.element import Comment
 from PIL import Image
@@ -22,7 +22,7 @@ def write_comment(fh, comment_text):
     if not const.NO_COMMENTS:
         fh.write(Comment(comment_text).output_ready())
 
-def parse_string(string, pattern):
+def parse_string(string, pattern, path=False):
     s = re.split('{(.*?)}', pattern)
     counts = {}
     for i in range(0, len(s), 2):
@@ -31,7 +31,8 @@ def parse_string(string, pattern):
         item = s[i].split(' ', 1)
         key = item[0]
         if len(item) == 1:
-            fmt = "(?P<%s%i>.*?)"
+            c = '[^'+re.escape(sep)+']' if path else '.'
+            fmt = "(?P<%s%i>{}*?)".format(c)
         else:
             escaped_item = re.escape(item[1])
             fmt = "(?P<%s%i>{})?".format(escaped_item)

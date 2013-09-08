@@ -188,9 +188,9 @@ def parse_args():
         ArgumentParser(description=const.PROGRAM_DESCRIPTION,
                        prog=const.PROGRAM_NAME)
     parser.add_argument('source', nargs='+', type=isfileordir,
-                        help=_('source file or directory'))
+                        help=_('source log file or directory'))
     parser.add_argument('destination', type=isnotfile,
-                        help=_('destination directory'))
+                        help=_('destination log directory'))
     parser.add_argument("-d", "--debug",
                         help=_("enable debug output"),
                         action='store_true',
@@ -299,10 +299,9 @@ def cleanup(exitcode):
     return exitcode
 
 if __name__ == "__main__":
-    options = None
+    options = parse_args()
+    exitcode = 0
     try:
-        exitcode = 0
-        options = parse_args()
         timezones.init()
         exitcode = main(options)
     except KeyboardInterrupt:

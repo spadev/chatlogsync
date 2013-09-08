@@ -29,8 +29,10 @@ class PidginHtml(ChatlogFormat):
                    'facebook': 'jabber',
                    'aim': 'aim',
                    }
-    FILE_PATTERN = ('/logs/{service}/{source}/{destination}{isgroup .chat}/'
-                    '{time}.html')
+    FILE_PATTERN = join('{service}',
+                        '{source}',
+                        '{destination}{isgroup .chat}',
+                        '{time}.html')
     TIME_FMT_FILE = '%Y-%m-%d.%H%M%S%z%Z'
     STRPTIME_FMT_FILE = '%Y-%m-%d.%H%M%S'
     TITLE_PATTERN = _("Conversation with {destination} "
@@ -102,7 +104,7 @@ class PidginHtml(ChatlogFormat):
         self.TIME_FMT_TITLE = timezones.locale_datetime_fmt
 
     def parse_path(self, path):
-        info = util.parse_string(path, self.FILE_PATTERN)
+        info = util.parse_string(path, self.FILE_PATTERN, path=True)
         if not info:
             return None
 

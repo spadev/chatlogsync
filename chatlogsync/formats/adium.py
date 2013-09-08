@@ -43,10 +43,10 @@ class Adium(ChatlogFormat):
                      'windowOpened': Event.WINDOWOPENED,
                      }
 
-    FILE_PATTERN = ('/Logs/{service}.{source}/'
-                    '{destination}/'
-                    '{destination} ({time}).chatlog/'
-                    '{destination} ({time}).xml')
+    FILE_PATTERN = join('{service}.{source}',
+                        '{destination}',
+                        '{destination} ({time}).chatlog',
+                        '{destination} ({time}).xml')
     IMAGE_DIRECTORY = '.'
     TIME_FMT_FILE = '%Y-%m-%dT%H.%M.%S%z'
     STRPTIME_FMT_FILE = '%Y-%m-%dT%H.%M.%S'
@@ -95,7 +95,7 @@ class Adium(ChatlogFormat):
         return False
 
     def parse_path(self, path):
-        info = util.parse_string(path, self.FILE_PATTERN)
+        info = util.parse_string(path, self.FILE_PATTERN, path=True)
         if not info:
             return None
 
