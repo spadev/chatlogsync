@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# Copyright 2013 spadev
+# Copyright 2013 Evan Vitero
 
 # This file is part of chatlogsync.
 
