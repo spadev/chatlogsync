@@ -24,7 +24,7 @@ Dependencies
 
 Usage
 -----
-* Similar to ```rsync```
+* Vaguely similar to ```rsync```
 
 ```
 usage: chatlogsync [-h] [-d] [-f {adium,pidgin-html}] [-F] [-n]
