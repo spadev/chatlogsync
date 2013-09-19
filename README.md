@@ -20,7 +20,7 @@ Dependencies
 
 *Ubuntu*
 
-```aptitude install python-bs4 python-dateutil python-tz python-imaging```
+```apt-get install python-bs4 python-dateutil python-tz python-imaging```
 
 Usage
 -----
