@@ -61,29 +61,39 @@ def init():
         timezone = dtz.gettz(name)
         now = dt.datetime.now(timezone)
 
-        offset_s = now.strftime('%z')
-        if not offset_s:
-            print_d('no timezone offset for', name)
-            continue
-
-        o1 = int(offset_s[:-2])
-        o2 = int(offset_s[-2:])/0.6
-        offset_i = o1 + (o2 if o2 > 0 else -o2)
-        offset_i = int(offset_i*3600)
-
-        abbrev=now.strftime('%Z')
-
-        tznames[offset_s].append((name, abbrev))
-        tznames[offset_i].append((name, abbrev))
-        tznames[abbrev].append((name, abbrev))
-
-        tzabbrevs[name] = abbrev
-        tzoffsets_i[name] = offset_i
-        tzoffsets_i[offset_s] = offset_i
-        tzoffsets_s[name] = offset_s
+        abbrevs = set()
+        for days in xrange(0, 365, 90):
+            abbrev = _update_lists(name, now + dt.timedelta(days=days), abbrevs)
+            abbrevs.add(abbrev)
 
     for k in iter(tznames.keys()):
         tznames[k].sort(key=_sort_func)
+
+def _update_lists(name, dt_obj, abbrevs):
+    abbrev = dt_obj.strftime('%Z')
+    if abbrev in abbrevs:
+        return
+
+    offset_s = dt_obj.strftime('%z')
+    if not offset_s:
+        print_d('no timezone offset for', name)
+        return
+
+    o1 = int(offset_s[:-2])
+    o2 = int(offset_s[-2:])/0.6
+    offset_i = o1 + (o2 if o2 > 0 else -o2)
+    offset_i = int(offset_i*3600)
+
+    tznames[offset_s].append((name, abbrev))
+    tznames[offset_i].append((name, abbrev))
+    tznames[abbrev].append((name, abbrev))
+
+    tzabbrevs[name] = abbrev
+    tzoffsets_i[name, abbrev] = offset_i
+    tzoffsets_i[offset_s] = offset_i
+    tzoffsets_s[name, abbrev] = offset_s
+
+    return abbrev
 
 def _sort_func(entry):
     name, abbrev = entry
@@ -95,18 +105,14 @@ def _sort_func(entry):
 
 def getoffset(abbrev, offset):
     """Return a dateutil.tz.tzoffset object"""
-    if not abbrev and not offset:
-        return 0
-
     if not abbrev:
-        name, abbrev = tznames[offset][0]
-        if not isinstance(offset, int):
-            offset = tzoffsets_i[name]
+        abbrev = tznames.get(offset, [None, None])[0][1]
 
-    if not offset:
-        name = tznames[abbrev][0][0]
-        offset = tzoffsets_i[name]
+    if offset is None:
+        name = tznames.get(abbrev, [None, None])[0][0]
+        offset = tzoffsets_i.get((name, abbrev))
     elif not isinstance(offset, int):
-        offset = tzoffsets_i[offset]
+        offset = tzoffsets_i.get(offset)
 
-    return dtz.tzoffset(abbrev, offset)
+    return dtz.tzoffset(abbrev, offset) \
+        if abbrev is not None and offset is not None else 0
