@@ -38,18 +38,22 @@ class PidginHtml(ChatlogFormat):
     type = 'pidgin-html'
     IMAGE_DIRECTORY = '.'
 
-    SERVICE_MAP = {'jabber': 'jabber',
-                   'aim': 'aim',
-                   }
-    PAM_ECIVRES = {'gtalk': 'jabber',
-                   'jabber': 'jabber',
-                   'facebook': 'jabber',
-                   'aim': 'aim',
-                   }
-    FILE_PATTERN = join('{service}',
-                        '{source}',
-                        '{destination}{isgroup .chat}',
-                        '{time}.html')
+    SERVICE_MAP = {
+        'jabber': 'jabber',
+        'aim': 'aim',
+    }
+    PAM_ECIVRES = {
+        'gtalk': 'jabber',
+        'jabber': 'jabber',
+        'facebook': 'jabber',
+        'aim': 'aim',
+    }
+    FILE_PATTERN = join(
+        '{service}',
+        '{source}',
+        '{destination}{isgroup .chat}',
+        '{time}.html'
+    )
     TIME_FMT_FILE = '%Y-%m-%d.%H%M%S%z%Z'
     STRPTIME_FMT_FILE = '%Y-%m-%d.%H%M%S'
     TITLE_PATTERN = _("Conversation with {destination} "
@@ -99,22 +103,24 @@ class PidginHtml(ChatlogFormat):
     TIME_FMT_CONVERSATION = "(%X)"
     TIME_FMT_CONVERSATION_WITH_DATE = "(%x %X)"
 
-    STATUS_TYPEMAP = {_("{alias} has gone away."): Status.AWAY,
-                      _("{alias} is no longer {type}."): Status.AVAILABLE,
-                      _("{alias} has signed off."): Status.OFFLINE,
-                      _("{alias} has signed on."): Status.ONLINE,
-                      _("{alias} has become idle."): Status.IDLE,
-                      _("{alias} is mobile."): Status.MOBILE,
-                      }
+    STATUS_TYPEMAP = {
+        _("{alias} has gone away."): Status.AWAY,
+        _("{alias} is no longer {type}."): Status.AVAILABLE,
+        _("{alias} has signed off."): Status.OFFLINE,
+        _("{alias} has signed on."): Status.ONLINE,
+        _("{alias} has become idle."): Status.IDLE,
+        _("{alias} is mobile."): Status.MOBILE,
+    }
 
-    CHAT_STATUS_TYPEMAP = {_("{alias} entered the room."): Status.SYSTEM,
-                           _("{alias} left the room."): Status.SYSTEM,
-                           }
+    CHAT_STATUS_TYPEMAP = {
+        _("{alias} entered the room."): Status.SYSTEM,
+        _("{alias} left the room."): Status.SYSTEM,
+    }
 
-    UNTRANSFORMS = {'source':
-                        (lambda s, c: (s+'/'+c.resource) if c.resource
-                         else s)
-                    }
+    UNTRANSFORMS = {
+        'source': (lambda s, c: (s+'/'+c.resource) if c.resource
+                   else s)
+    }
 
     def __init__(self, *args):
         super(PidginHtml, self).__init__(*args)

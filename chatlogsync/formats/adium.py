@@ -38,32 +38,37 @@ from chatlogsync.timezones import getoffset
 
 class Adium(ChatlogFormat):
     type = 'adium'
-    SERVICE_MAP = {'GTalk' : 'gtalk',
-                   'AIM' : 'aim',
-                   'Facebook' : 'facebook',
-                   }
+    SERVICE_MAP = {
+        'GTalk' : 'gtalk',
+        'AIM' : 'aim',
+        'Facebook' : 'facebook',
+    }
 
-    STATUS_TYPEMAP = {'offline': Status.OFFLINE,
-                      'online': Status.ONLINE,
-                      'disconnected': Status.DISCONNECTED,
-                      'connected': Status.CONNECTED,
-                      'away': Status.AWAY,
-                      'idle': Status.IDLE,
-                      'mobile': Status.MOBILE,
-                      'purple': Status.SYSTEM,
-                      'available': Status.AVAILABLE,
-                      'chat-error': Status.ERROR,
-                      }
+    STATUS_TYPEMAP = {
+        'offline': Status.OFFLINE,
+        'online': Status.ONLINE,
+        'disconnected': Status.DISCONNECTED,
+        'connected': Status.CONNECTED,
+        'away': Status.AWAY,
+        'idle': Status.IDLE,
+        'mobile': Status.MOBILE,
+        'purple': Status.SYSTEM,
+        'available': Status.AVAILABLE,
+        'chat-error': Status.ERROR,
+    }
 
 
-    EVENT_TYPEMAP = {'windowClosed': Event.WINDOWCLOSED,
-                     'windowOpened': Event.WINDOWOPENED,
-                     }
+    EVENT_TYPEMAP = {
+        'windowClosed': Event.WINDOWCLOSED,
+        'windowOpened': Event.WINDOWOPENED,
+    }
 
-    FILE_PATTERN = join('{service}.{source}',
-                        '{destination}',
-                        '{destination} ({time}).chatlog',
-                        '{destination} ({time}).xml')
+    FILE_PATTERN = join(
+        '{service}.{source}',
+        '{destination}',
+        '{destination} ({time}).chatlog',
+        '{destination} ({time}).xml'
+    )
     IMAGE_DIRECTORY = '.'
     TIME_FMT_FILE = '%Y-%m-%dT%H.%M.%S%z'
     STRPTIME_FMT_FILE = '%Y-%m-%dT%H.%M.%S'
@@ -72,34 +77,36 @@ class Adium(ChatlogFormat):
     XMLNS = "http://purl.org/net/ulf/ns/0.4-02"
     XML_HEADER = '<?xml version="1.0" encoding="UTF-8" ?>'
 
-    ATTRS = {'chat': ('xmlns', 'account', 'service', 'resource', 'groupchat'),
-             'message': ('sender', 'time', 'auto', 'alias'),
-             'status': ('type', 'sender', 'time', 'alias'),
-             'event': ('type', 'sender', 'time', 'alias'),
-             }
+    ATTRS = {
+        'chat': ('xmlns', 'account', 'service', 'resource', 'groupchat'),
+        'message': ('sender', 'time', 'auto', 'alias'),
+        'status': ('type', 'sender', 'time', 'alias'),
+        'event': ('type', 'sender', 'time', 'alias'),
+    }
 
     # adium doesn't include the @chat.facebook.com for the source
-    TRANSFORMS = {'source':
-                      (lambda s, c: s+'@chat.facebook.com'
-                       if c.service == 'facebook' else s),
-                  }
-    UNTRANSFORMS = {'source':
-                        (lambda s, c: s.replace('@chat.facebook.com', '')
-                         if c.service == 'facebook' else s),
-                    }
+    TRANSFORMS = {
+        'source': (lambda s, c: s+'@chat.facebook.com'
+                   if c.service == 'facebook' else s),
+    }
+    UNTRANSFORMS = {
+        'source': (lambda s, c: s.replace('@chat.facebook.com', '')
+                   if c.service == 'facebook' else s),
+    }
 
     SENDER_RE = re.compile('<[^<>]*sender="(?P<sender>.*?)".*?>')
     IMGTAG_RE = re.compile('<img (.*?)([/]?)>(.*)')
+    TIMESTR_RE = re.compile('^(?P<ts1>.*)(?P<ts2>[-+]\d+)$')
 
-    def _parse_ftime(self, timestr):
-        ts1, ts2 = timestr[:-5], timestr[-5:]
-        t = datetime.datetime.strptime(ts1, self.STRPTIME_FMT_FILE)
-        return t.replace(tzinfo=getoffset(None, ts2))
+    def _parse_time(self, timestr, fmt):
+        match = re.match(self.TIMESTR_RE, timestr)
+        try:
+            ts1, ts2 = match.groups()
+        except:
+            raise ParseError("problem parsing time string %s" % timestr)
 
-    def _parse_ctime(self, timestr):
-        ts1, ts2 = timestr[:-6], timestr[-6:].replace(':', '')
-        t = datetime.datetime.strptime(ts1, self.STRPTIME_FMT_CONVERSATION)
-        return t.replace(tzinfo=getoffset(None, ts2))
+        dt = datetime.datetime.strptime(ts1, fmt)
+        return dt.replace(tzinfo=getoffset(None, ts2))
 
     def _isgroup(self, lines, path, source, destination):
         senders = set((source, destination, None))
@@ -116,7 +123,7 @@ class Adium(ChatlogFormat):
         if not info:
             return None
 
-        time = self._parse_ftime(info['time'])
+        time = self._parse_time(info['time'], self.STRPTIME_FMT_FILE)
         destination = info['destination']
         service = self.SERVICE_MAP[info['service']]
         source = info['source']
@@ -200,7 +207,9 @@ class Adium(ChatlogFormat):
 
             attrs['auto'] = True if attrs['auto'] else False
             if attrs['time']:
-                attrs['time'] = self._parse_ctime(attrs['time'])
+                fmt = self.STRPTIME_FMT_CONVERSATION
+                attrs['time'] = self._parse_time(attrs['time'], fmt)
+
             attrs['html'] =  list(e.children)
 
             if e.name == 'status':
