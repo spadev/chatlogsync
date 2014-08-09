@@ -96,12 +96,13 @@ class Adium(ChatlogFormat):
 
     SENDER_RE = re.compile('<[^<>]*sender="(?P<sender>.*?)".*?>')
     IMGTAG_RE = re.compile('<img (.*?)([/]?)>(.*)')
-    TIMESTR_RE = re.compile('^(?P<ts1>.*)(?P<ts2>[-+]\d+)$')
+    TIMESTR_RE = re.compile('^(?P<ts1>.*)(?P<ts2>[-+][\d:]+)$')
 
     def _parse_time(self, timestr, fmt):
         match = re.match(self.TIMESTR_RE, timestr)
         try:
             ts1, ts2 = match.groups()
+            ts2 = ts2.replace(':', '')
         except:
             raise ParseError("problem parsing time string %s" % timestr)
 
@@ -190,14 +191,15 @@ class Adium(ChatlogFormat):
         attrs = {}
         cons = None
 
-        for e in BeautifulSoup(line, ['lxml', 'xml']).children:
-            if isinstance(e, Comment):
-                alternate, status_html = e.split('|', 1)
+        for elem in BeautifulSoup(line, ['lxml', 'xml']).children:
+            if isinstance(elem, Comment):
+                alternate, status_html = elem.split('|', 1)
                 attrs['alternate'] = True if alternate else False
                 status_html = [NavigableString(status_html)]
                 continue
-            for a in ('alias', 'sender', 'auto', 'time'):
-                attrs[a] = e.get(a, '')
+
+            for key in ('alias', 'sender', 'auto', 'time'):
+                attrs[key] = elem.get(key, '')
 
             if attrs['sender'] == source:
                 attrs['sender'] = transformed_source
@@ -205,29 +207,29 @@ class Adium(ChatlogFormat):
             else:
                 attrs['isuser'] = False
 
-            attrs['auto'] = True if attrs['auto'] else False
+            attrs['auto'] = bool(attrs['auto'])
             if attrs['time']:
                 fmt = self.STRPTIME_FMT_CONVERSATION
                 attrs['time'] = self._parse_time(attrs['time'], fmt)
 
-            attrs['html'] =  list(e.children)
+            attrs['html'] =  list(elem.children)
 
-            if e.name == 'status':
+            if elem.name == 'status':
                 cons = Status
-                attrs['type'] = self.STATUS_TYPEMAP.get(e.get('type'), None)
+                attrs['type'] = self.STATUS_TYPEMAP.get(elem.get('type'), None)
                 if attrs['type'] in Status.USER_TYPES:
                     attrs['msg_html'] = attrs['html']
                     attrs['html'] = status_html
-            elif e.name == 'event':
+            elif elem.name == 'event':
                 cons = Event
-                attrs['type'] = self.EVENT_TYPEMAP.get(e.get('type'), None)
-            elif e.name == 'message':
+                attrs['type'] = self.EVENT_TYPEMAP.get(elem.get('type'), None)
+            elif elem.name == 'message':
                 cons = Message
             else:
-                raise TypeError("unknown type '%s' for entry" % e.name)
+                raise TypeError("unknown type '%s' for entry" % elem.name)
 
             if not attrs['sender'] and not attrs['alias']:
-                print_d("%s is a system entry" % e)
+                print_d("%s is a system entry" % elem)
                 attrs['system'] = True
 
         if not cons:
@@ -243,8 +245,8 @@ class Adium(ChatlogFormat):
                 )
         conversation = conversations[0]
 
-        fh = codecs.open(path, 'wb', 'utf-8')
-        fh.write(self.XML_HEADER+'\n')
+        file_object = codecs.open(path, 'wb', 'utf-8')
+        file_object.write(self.XML_HEADER+'\n')
         untransformed_source = self.UNTRANSFORMS['source'](conversation.source,
                                                            conversation)
         attrs = dict(xmlns=self.XMLNS, account=untransformed_source,
@@ -256,10 +258,10 @@ class Adium(ChatlogFormat):
                 conversation.original_parser_name != self.type:
             attrs['groupchat'] = "true"
 
-        util.write_comment(fh, const.HEADER_COMMENT %
+        util.write_comment(file_object, const.HEADER_COMMENT %
                            conversation.original_parser_name)
-        self._write_xml(fh, 'chat', attrs, conversation,close=False)
-        fh.write('\n')
+        self._write_xml(file_object, 'chat', attrs, conversation,close=False)
+        file_object.write('\n')
 
         for i, entry in enumerate(conversation.entries):
             attrs = {'alias': entry.alias,
@@ -304,19 +306,19 @@ class Adium(ChatlogFormat):
                 htmlattr = 'html'
 
             if [x for x in comment if x]:
-                util.write_comment(fh, '|'.join(comment))
+                util.write_comment(file_object, '|'.join(comment))
 
-            self._write_xml(fh, name, attrs, conversation,
+            self._write_xml(file_object, name, attrs, conversation,
                             contents=getattr(entry, htmlattr))
             if i != len(conversation.entries)-1:
-                fh.write('\n')
+                file_object.write('\n')
 
-        fh.write('</chat>')
-        fh.close()
+        file_object.write('</chat>')
+        file_object.close()
 
         self.copy_images(path, conversation)
 
-    def _write_xml(self, fh, name, attrs, conversation,
+    def _write_xml(self, file_object, name, attrs, conversation,
                    contents=[], close=True):
         attrlist = []
         for n in self.ATTRS[name]:
@@ -324,32 +326,36 @@ class Adium(ChatlogFormat):
             if v:
                 attrlist.append((n, v))
         attrstr = " ".join(['%s="%s"' % (n,v)  for n, v in attrlist])
-        fh.write("<%s %s>" % (name, attrstr))
+        file_object.write("<%s %s>" % (name, attrstr))
 
-        for e in contents:
-            if isinstance(e, Tag):
+        for elem in contents:
+            if isinstance(elem, NavigableString) or isinstance(elem, Comment):
+                elem.setup() # workaround for BeautifulSoup issue
+
+            if isinstance(elem, Tag):
                 # must include size of the image to display properly in adium
                 # log viewer. width and height attributes must come before src.
-                if e.name == 'img':
-                    src = e.get('src')
+                if elem.name == 'img':
+                    src = elem.get('src')
                     if src in conversation.images and \
-                            not e.has_attr('width') or not e.has_attr('height'):
+                            not elem.has_attr('width') or \
+                            not elem.has_attr('height'):
                         idx = conversation.images.index(src)
                         fullpath = conversation.images_full[idx][1]
-                        e['width'], e['height'] = util.get_image_size(fullpath)
-                    m = self.IMGTAG_RE.match(e.decode())
+                        elem['width'], elem['height'] = util.get_image_size(fullpath)
+                    m = self.IMGTAG_RE.match(elem.decode())
                     attributes, close, rest = m.groups()
                     attributes = attributes.split()
                     attributes.sort(key=lambda x: 'b' if x.startswith('width') or
                                     x.startswith('height') else x)
-                    fh.write('<img %s%s>%s' %
+                    file_object.write('<img %s%s>%s' %
                              (' '.join(attributes), close, rest))
                 else:
-                    fh.write(e.decode())
+                    file_object.write(elem.decode())
             else:
-                fh.write(e.output_ready())
+                file_object.write(elem.output_ready())
 
         if close:
-            fh.write("</%s>" % name)
+            file_object.write("</%s>" % name)
 
 formats = [Adium]

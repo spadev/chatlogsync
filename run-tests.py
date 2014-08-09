@@ -36,6 +36,8 @@ def get_extension(directory):
                 os.unlink(join(root, file))
             if extension:
                 extensions[extension] += 1
+    if len(extensions) == 0:
+        return None
     return max(extensions.items(), key=lambda x: x[1])[0][1:]
 
 def gather():

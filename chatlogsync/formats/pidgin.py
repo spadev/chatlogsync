@@ -405,6 +405,17 @@ class PidginHtml(ChatlogFormat):
 
         return info, original_parser_name
 
+    def _write_title(self, file_object, conversation):
+        string = self.fill_pattern(conversation, self.TITLE_PATTERN,
+                                     self.TIME_FMT_TITLE, untransform=True)
+        string_elem = NavigableString(string)
+        string_elem.setup() # workaround for BeautifulSoup issue
+        formatted_title = string_elem.output_ready()
+
+        file_object.write(self.TITLE_LINE_FMT %
+                          (formatted_title, formatted_title)
+                          + '\n')
+
     def write(self, path, conversations):
         if len(conversations) != 1:
             raise ParseError(
@@ -414,27 +425,24 @@ class PidginHtml(ChatlogFormat):
                 )
 
         conversation = conversations[0]
-        titlestr = self.fill_pattern(conversation, self.TITLE_PATTERN,
-                                     self.TIME_FMT_TITLE, untransform=True)
-        titlestr = NavigableString(titlestr).output_ready()
-        fh = codecs.open(path, 'wb', 'utf-8')
-        util.write_comment(fh, const.HEADER_COMMENT %
+        file_object = codecs.open(path, 'wb', 'utf-8')
+        util.write_comment(file_object, const.HEADER_COMMENT %
                            conversation.original_parser_name)
-        fh.write(self.TITLE_LINE_FMT % (titlestr, titlestr) + '\n')
+        self._write_title(file_object, conversation)
 
         for entry in conversation.entries:
             timefmt = self.TIME_FMT_CONVERSATION_WITH_DATE if entry.delayed \
                 else self.TIME_FMT_CONVERSATION
-            self._write_entry(fh, entry, conversation, timefmt)
-            fh.write('\n')
+            self._write_entry(file_object, entry, conversation, timefmt)
+            file_object.write('\n')
 
         # newline at end
-        fh.write('</body></html>\n')
-        fh.close()
+        file_object.write('</body></html>\n')
+        file_object.close()
 
         self.copy_images(path, conversation)
 
-    def _write_entry(self, fh, entry, conversation, timefmt):
+    def _write_entry(self, file_object, entry, conversation, timefmt):
         timestr = entry.time.strftime(timefmt)
         if isinstance(entry, Message):
             if entry.alternate:
@@ -452,18 +460,18 @@ class PidginHtml(ChatlogFormat):
             if conversation.isgroup and entry.alias \
                     and entry.alias != entry.sender and \
                     entry.sender != conversation.source:
-                util.write_comment(fh, entry.sender)
+                util.write_comment(file_object, entry.sender)
 
-            fh.write(self.MESSAGE_LINE_FMT % (color, timestr, name, autoreply))
-            self._write_entry_html(fh, entry)
-            fh.write(self.MESSAGE_LINE_END)
+            file_object.write(self.MESSAGE_LINE_FMT % (color, timestr, name, autoreply))
+            self._write_entry_html(file_object, entry)
+            file_object.write(self.MESSAGE_LINE_END)
         elif isinstance(entry, Status):
             # append comment indicating this Status was not parsed by us
             if conversation.original_parser_name != self.type:
                 text = "%s|%s|%s" % (entry.type,
                                      '1' if entry.system else '',
                                      entry.sender)
-                util.write_comment(fh, text)
+                util.write_comment(file_object, text)
 
             if entry.type == Status.ERROR:
                 fmt = self.ERROR_LINE_FMT
@@ -472,17 +480,20 @@ class PidginHtml(ChatlogFormat):
                 fmt = self.STATUS_LINE_FMT
                 end = self.STATUS_LINE_END
 
-            fh.write(fmt % timestr)
-            self._write_entry_html(fh, entry)
-            fh.write(end)
+            file_object.write(fmt % timestr)
+            self._write_entry_html(file_object, entry)
+            file_object.write(end)
         else:
-            util.write_comment(fh, entry.dump())
+            util.write_comment(file_object, entry.dump())
 
-    def _write_entry_html(self, fh, entry):
-        for e in entry.html:
-            if isinstance(e, Tag):
-                fh.write(e.decode())
+    def _write_entry_html(self, file_object, entry):
+        for elem in entry.html:
+            if isinstance(elem, NavigableString) or isinstance(elem, Comment):
+                elem.setup() # workaround for BeautifulSoup issue
+
+            if isinstance(elem, Tag):
+                file_object.write(elem.decode())
             else:
-                fh.write(e.output_ready())
+                file_object.write(elem.output_ready())
 
 formats = [PidginHtml]

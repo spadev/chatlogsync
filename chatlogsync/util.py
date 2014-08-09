@@ -35,9 +35,11 @@ def get_image_size(fullpath):
         im = Image.open(fp)
     return im.size
 
-def write_comment(fh, comment_text):
+def write_comment(file_object, comment_text):
     if not const.NO_COMMENTS:
-        fh.write(Comment(comment_text).output_ready())
+        comment = Comment(comment_text)
+        comment.setup() # workaround for BeautifulSoup issue
+        file_object.write(comment.output_ready())
 
 def parse_string(string, pattern, path=False):
     s = re.split('{(.*?)}', pattern)
